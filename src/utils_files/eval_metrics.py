@@ -3,6 +3,7 @@
 """This module evaluates the forecasted trajectories against the ground truth."""
 
 import math
+from pprint import pprint
 from typing import Dict, List, Optional
 
 import numpy as np
@@ -235,22 +236,25 @@ def post_eval(args, file2pred, file2labels, file2pred_score, DEs):
         from utils_files import eval_metrics
         metric_results = eval_metrics.get_displacement_errors_and_miss_rate(file2pred, file2labels, args.mode_num, args.future_frame_num, 2.0, file2pred_score)
         utils.logging(metric_results, type=score_file, to_screen=True, append_time=True)
-        print("brier-minFDE",('%.4f' % metric_results["brier-minFDE"]), ",brier-minADE",('%.4f' % metric_results["brier-minADE"]),\
-            ",minADE",('%.4f' % metric_results["minADE"]),",minFDE",('%.4f' % metric_results["minFDE"]),",MR",('%.4f' % metric_results["MR"]))
+        print(f'metric_results (mode_num = {args.mode_num}):')
+        pprint(metric_results)
         if args.mode_num == 5:
-            metric_results = eval_metrics.get_displacement_errors_and_miss_rate(file2pred, file2labels, 10, args.future_frame_num, 2.0, file2pred_score)
+            extra_mode_num = 10
+            metric_results = eval_metrics.get_displacement_errors_and_miss_rate(file2pred, file2labels, extra_mode_num, args.future_frame_num, 2.0, file2pred_score)
             utils.logging(metric_results, type=score_file, to_screen=True, append_time=True)
-            print("brier-minFDE_10",('%.4f' % metric_results["brier-minFDE"]), ",brier-minADE_10",('%.4f' % metric_results["brier-minADE"]),\
-            ",minADE_10",('%.4f' % metric_results["minADE"]),",minFDE_10",('%.4f' % metric_results["minFDE"]),",MR_10",('%.4f' % metric_results["MR"]))
+            print(f'metric_results (mode_num = {extra_mode_num}):')
+            pprint(metric_results)
         if args.mode_num == 10:
-            metric_results = eval_metrics.get_displacement_errors_and_miss_rate(file2pred, file2labels, 5, args.future_frame_num, 2.0, file2pred_score)
+            extra_mode_num = 5
+            metric_results = eval_metrics.get_displacement_errors_and_miss_rate(file2pred, file2labels, extra_mode_num, args.future_frame_num, 2.0, file2pred_score)
             utils.logging(metric_results, type=score_file, to_screen=True, append_time=True)
-            print("brier-minFDE_5",('%.4f' % metric_results["brier-minFDE"]), ",brier-minADE_5",('%.4f' % metric_results["brier-minADE"]),\
-            ",minADE_5",('%.4f' % metric_results["minADE"]),",minFDE_5",('%.4f' % metric_results["minFDE"]),",MR_5",('%.4f' % metric_results["MR"]))
-        metric_results = eval_metrics.get_displacement_errors_and_miss_rate(file2pred, file2labels, 1, args.future_frame_num, 2.0, file2pred_score)
+            print(f'metric_results (mode_num = {extra_mode_num}):')
+            pprint(metric_results)
+        extra_mode_num = 1
+        metric_results = eval_metrics.get_displacement_errors_and_miss_rate(file2pred, file2labels, extra_mode_num, args.future_frame_num, 2.0, file2pred_score)
         utils.logging(metric_results, type=score_file, to_screen=True, append_time=True)
-        print("brier-minFDE_1",('%.4f' % metric_results["brier-minFDE"]), ",brier-minADE_1",('%.4f' % metric_results["brier-minADE"]),\
-        ",minADE_1",('%.4f' % metric_results["minADE"]),",minFDE_1",('%.4f' % metric_results["minFDE"]),",MR1",('%.4f' % metric_results["MR"]))
+        print(f'metric_results (mode_num = {extra_mode_num}):')
+        pprint(metric_results)
     else:
         from argoverse.evaluation import eval_forecasting
         metric_results = eval_forecasting.get_displacement_errors_and_miss_rate(file2pred, file2labels, args.mode_num, args.future_frame_num, 2.0, file2pred_score)
