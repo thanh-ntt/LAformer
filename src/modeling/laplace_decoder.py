@@ -132,10 +132,10 @@ class GRUDecoder(nn.Module):
             dense_lane_targets = torch.zeros([batch_size, dense], device=device, dtype=torch.long)
             for i in range(batch_size):
                 dense_lane_targets[i, :] = torch.tensor(np.array(mapping[i]['dense_lane_labels']), dtype=torch.long, device=device)
-            loss_weight = self.args.lane_loss_weight
+            loss_weight = self.args.lane_loss_weight  # \lambda_1
             dense_lane_targets = dense_lane_targets.view(-1) # [N*H]
             loss += loss_weight*F.nll_loss(dense_lane_pred, dense_lane_targets, reduction='none').\
-                    view(batch_size, dense).sum(dim=1)
+                    view(batch_size, dense).sum(dim=1) # cross-entropy loss L_lane
         mink = self.args.topk
         dense_lane_topk = torch.zeros((dense_lane_pred.shape[0], mink, self.hidden_size), device=device) # [N*dense, mink, hidden_size]
         dense_lane_topk_scores = torch.zeros((dense_lane_pred.shape[0], mink), device=device)   # [N*dense, mink]
@@ -167,7 +167,7 @@ class GRUDecoder(nn.Module):
             dense_lane_topk = self.dense_lane_aware\
             (0, mapping, lane_states_batch, lane_states_length, local_embed, inputs_lengths, global_embed, device, loss) # [N, dense*mink, hidden_size + 1]
             dense_lane_topk = dense_lane_topk.permute(1, 0, 2)  # [dense*mink, N, hidden_size + 1]
-            dense_lane_topk = self.proj_topk(dense_lane_topk) # [dense*mink, N, hidden_size]
+            dense_lane_topk = self.proj_topk(dense_lane_topk) # [dense*mink, N, hidden_size]   # paper concat dense_lane_topk directly, but this use MLP (proj_topk)
             global_embed_att = global_embed + self.aggregation_cross_att(global_embed.unsqueeze(0), dense_lane_topk).squeeze(0) # [N, D]
             global_embed = torch.cat([global_embed, global_embed_att], dim=-1) # [N, 2*D]
         local_embed = local_embed.repeat(self.num_modes, 1, 1)  # [F, N, D]

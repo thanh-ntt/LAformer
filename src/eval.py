@@ -116,8 +116,8 @@ def do_eval(args):
         output_path = 'competition_files_nuscenes/'
         if not os.path.exists(output_path):
             os.makedirs(output_path)
-        json.dump(submission_nuscenes, open(os.path.join(output_path, "evalai_submission.json"), "w"), cls=NpEncoder)   
-    from datascripts.dataset_argoverse import post_eval
+        json.dump(submission_nuscenes, open(os.path.join(output_path, "evalai_submission.json"), "w"), cls=NpEncoder)
+    from utils_files.eval_metrics import post_eval
     post_eval(args, file2pred, file2labels, file2pred_score, DEs)
 
 

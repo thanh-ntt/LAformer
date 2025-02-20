@@ -3,7 +3,6 @@ import multiprocessing
 import os, sys
 import pickle
 import zlib
-import random
 from multiprocessing import Process
 root_path = os.path.abspath(__file__)
 root_path = '/'.join(root_path.split('/')[:-2])
@@ -14,7 +13,7 @@ import torch
 from tqdm import tqdm
 import pandas as pd
 from utils_files import utils, config
-from utils_files.utils import get_name, get_angle, logging, rotate, round_value, get_pad_vector, get_dis, larger, assert_, get_subdivide_points
+from utils_files.utils import get_name, get_angle, logging, rotate, get_pad_vector, get_dis, larger, assert_, get_subdivide_points
 
 TIMESTAMP = 0
 TRACK_ID = 1
@@ -580,32 +579,4 @@ class Dataset(torch.utils.data.Dataset):
         data['past_traj'] = past
 
         return data
-
-def post_eval(args, file2pred, file2labels, file2pred_score, DEs):
-    score_file = args.model_recover_path.split('/')[-1]
-    if "nuscenes" in args.other_params:
-        from utils_files import eval_metrics
-        metric_results = eval_metrics.get_displacement_errors_and_miss_rate(file2pred, file2labels, args.mode_num, args.future_frame_num, 2.0, file2pred_score)
-        utils.logging(metric_results, type=score_file, to_screen=True, append_time=True)    
-        print("brier-minFDE",('%.4f' % metric_results["brier-minFDE"]), ",brier-minADE",('%.4f' % metric_results["brier-minADE"]),\
-            ",minADE",('%.4f' % metric_results["minADE"]),",minFDE",('%.4f' % metric_results["minFDE"]),",MR",('%.4f' % metric_results["MR"]))
-        if args.mode_num == 10:
-            metric_results = eval_metrics.get_displacement_errors_and_miss_rate(file2pred, file2labels, 5, args.future_frame_num, 2.0, file2pred_score)
-            utils.logging(metric_results, type=score_file, to_screen=True, append_time=True)    
-            print("brier-minFDE1",('%.4f' % metric_results["brier-minFDE"]), ",brier-minADE1",('%.4f' % metric_results["brier-minADE"]),\
-            ",minADE5",('%.4f' % metric_results["minADE"]),",minFDE5",('%.4f' % metric_results["minFDE"]),",MR1",('%.4f' % metric_results["MR"]))
-        metric_results = eval_metrics.get_displacement_errors_and_miss_rate(file2pred, file2labels, 1, args.future_frame_num, 2.0, file2pred_score)
-        utils.logging(metric_results, type=score_file, to_screen=True, append_time=True)    
-        print("brier-minFDE1",('%.4f' % metric_results["brier-minFDE"]), ",brier-minADE1",('%.4f' % metric_results["brier-minADE"]),\
-        ",minADE1",('%.4f' % metric_results["minADE"]),",minFDE1",('%.4f' % metric_results["minFDE"]),",MR1",('%.4f' % metric_results["MR"]))
-    else:
-        from argoverse.evaluation import eval_forecasting
-        metric_results = eval_forecasting.get_displacement_errors_and_miss_rate(file2pred, file2labels, args.mode_num, args.future_frame_num, 2.0, file2pred_score)
-        utils.logging(metric_results, type=score_file, to_screen=True, append_time=True)    
-        print("brier-minFDE",('%.4f' % metric_results["brier-minFDE"]), ",brier-minADE",('%.4f' % metric_results["brier-minADE"]),\
-            ",minADE",('%.4f' % metric_results["minADE"]),",minFDE",('%.4f' % metric_results["minFDE"]),",MR",('%.4f' % metric_results["MR"]))
-        metric_results = eval_forecasting.get_displacement_errors_and_miss_rate(file2pred, file2labels, 1, args.future_frame_num, 2.0, file2pred_score)
-        utils.logging(metric_results, type=score_file, to_screen=True, append_time=True)    
-        print("brier-minFDE1",('%.4f' % metric_results["brier-minFDE"]), ",brier-minADE1",('%.4f' % metric_results["brier-minADE"]),\
-            ",minADE1",('%.4f' % metric_results["minADE"]),",minFDE1",('%.4f' % metric_results["minFDE"]),",MR1",('%.4f' % metric_results["MR"]))
 
