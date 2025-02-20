@@ -72,7 +72,7 @@ def do_eval(args):
     device = torch.device(
         "cuda" if torch.cuda.is_available() and not args.no_cuda else "cpu")
 
-    print("Loading Evalute Dataset", args.data_dir)
+    print("Loading Evaluate Dataset", args.data_dir)
     from datascripts.dataset_argoverse import Dataset
     eval_dataset = Dataset(args, args.eval_batch_size)
     eval_sampler = SequentialSampler(eval_dataset)

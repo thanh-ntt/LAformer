@@ -26,6 +26,7 @@ from matplotlib.pyplot import MultipleLocator
 from torch import Tensor
 from utils_files import  config
 from utils_files.config import *
+from pprint import pprint
 
 args: config.Args = None
 logger = None
@@ -43,6 +44,7 @@ def init(args_: config.Args, logger_):
         args.log_dir = args.output_dir
     if args.temp_file_dir is None:
         args.temp_file_dir = os.path.join(args.output_dir, 'temp_file')
+        print(f'args.temp_file_dir {args.temp_file_dir}')
     else:
         args.reuse_temp_file = True
         args.temp_file_dir = os.path.join(args.temp_file_dir, 'temp_file')
@@ -115,7 +117,7 @@ def init(args_: config.Args, logger_):
     else:
         init_args_do_train()
 
-    print(dict(sorted(vars(args_).items())))
+    pprint(dict(sorted(vars(args_).items())))
     # print(json.dumps(vars(args_), indent=4))
     args_dict = vars(args)
     print()
