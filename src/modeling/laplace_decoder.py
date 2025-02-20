@@ -26,7 +26,7 @@ class DecoderResCat(nn.Module):
         return hidden_states
 
 class GRUDecoder(nn.Module):
-    def __init__(self, args, vectornet) -> None:
+    def __init__(self, args: config.Args, vectornet) -> None:
         super(GRUDecoder, self).__init__()
         min_scale: float = 1e-3
         self.input_size = args.hidden_size
@@ -107,13 +107,20 @@ class GRUDecoder(nn.Module):
             element_hidden_states (tensor): [N]
             global_hidden_states (tensor): [N]
             device (device): device"""
-        def dense_lane_scores():
+        def compute_dense_lane_scores():
             lane_states_batch_attention = lane_states_batch + self.dense_label_cross_attention(
                 lane_states_batch, element_hidden_states.unsqueeze(0), tgt_key_padding_mask=src_attention_mask_lane)
             dense_lane_scores = self.dense_lane_decoder(torch.cat([global_hidden_states.unsqueeze(0).expand(
                 lane_states_batch.shape), lane_states_batch, lane_states_batch_attention], dim=-1)) # [max_len, N, H]
             dense_lane_scores = F.log_softmax(dense_lane_scores, dim=0)
             return dense_lane_scores
+        def check_rules_lane_segments():
+            # TODO: return list of indices of lane segments that violate 1 or many rules
+            # Try this with topk lane segments first
+            pass
+        def check_nearby_lane_segments():
+            # TODO: check if any of the input lane segments are under nearby_lane_segment_threshold
+            pass
         max_vector_num = lane_states_batch.shape[1]
         batch_size = len(mapping)
         src_attention_mask_lane = torch.zeros([batch_size, lane_states_batch.shape[1]], device=device) # [N, max_len]
@@ -122,7 +129,7 @@ class GRUDecoder(nn.Module):
             src_attention_mask_lane[i, :lane_states_length[i]] = 1
         src_attention_mask_lane = src_attention_mask_lane == 0
         lane_states_batch = lane_states_batch.permute(1, 0, 2) # [max_len, N, H]
-        dense_lane_pred = dense_lane_scores() # [max_len, N, H]
+        dense_lane_pred = compute_dense_lane_scores() # [max_len, N, H]
         dense_lane_pred = dense_lane_pred.permute(1, 0, 2) # [N, max_len, H]
         lane_states_batch = lane_states_batch.permute(1, 0, 2) # [N, max_len, H]
         dense  = self.dense
@@ -132,9 +139,9 @@ class GRUDecoder(nn.Module):
             dense_lane_targets = torch.zeros([batch_size, dense], device=device, dtype=torch.long)
             for i in range(batch_size):
                 dense_lane_targets[i, :] = torch.tensor(np.array(mapping[i]['dense_lane_labels']), dtype=torch.long, device=device)
-            loss_weight = self.args.lane_loss_weight  # \lambda_1
+            lane_loss_weight = self.args.lane_loss_weight  # \lambda_1
             dense_lane_targets = dense_lane_targets.view(-1) # [N*H]
-            loss += loss_weight*F.nll_loss(dense_lane_pred, dense_lane_targets, reduction='none').\
+            loss += lane_loss_weight*F.nll_loss(dense_lane_pred, dense_lane_targets, reduction='none').\
                     view(batch_size, dense).sum(dim=1) # cross-entropy loss L_lane
         mink = self.args.topk
         dense_lane_topk = torch.zeros((dense_lane_pred.shape[0], mink, self.hidden_size), device=device) # [N*dense, mink, hidden_size]
@@ -143,7 +150,7 @@ class GRUDecoder(nn.Module):
         for i in range(dense_lane_topk_scores.shape[0]):
             idxs_lane = i // dense
             k = min(mink, lane_states_length[idxs_lane])
-            _, idxs_topk = torch.topk(dense_lane_pred[i], k)
+            _, idxs_topk = torch.topk(dense_lane_pred[i], k) # select top k=2 (or 4) lane segments to guide decoder
             dense_lane_topk[i][:k] = lane_states_batch[idxs_lane, idxs_topk] # [N*dense, mink, hidden_size]
             dense_lane_topk_scores[i][:k] = dense_lane_pred[i][idxs_topk] # [N*dense, mink]
         dense_lane_topk = torch.cat([dense_lane_topk, dense_lane_topk_scores.unsqueeze(-1)], dim=-1) # [N*dense, mink, hidden_size + 1]

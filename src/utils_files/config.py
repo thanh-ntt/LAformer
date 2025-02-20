@@ -49,7 +49,7 @@ def add_argument(parser):
     parser.add_argument("--lane_loss_weight",
                         default=10,
                         type=float,
-                        help="lane loss weight")
+                        help="lane loss weight, \lambda 1 in the total loss (section 3.3 & 3.4)")
     parser.add_argument("--model_recover_path",
                         default=None,
                         type=str)

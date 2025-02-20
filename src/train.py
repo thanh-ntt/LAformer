@@ -223,7 +223,8 @@ def run_training(rank, world_size, kwargs, queue):
         # if rank == 0:
         #     iter_bar = tqdm(train_dataloader, desc='Iter (loss=X.XXX)')
         # else:
-        iter_bar = train_dataloader
+        # iter_bar = train_dataloader
+        iter_bar = tqdm(train_dataloader, desc='Iter (loss=X.XXX)')
 
         train_one_epoch(model, iter_bar, optimizer, rank, args, i_epoch, queue)
         

@@ -30,7 +30,7 @@ class NpEncoder(json.JSONEncoder):
             return obj.tolist()
         return json.JSONEncoder.default(self, obj)
 
-def eval_instance_argoverse(batch_size, args, pred, pred_score, mapping, file2pred, file2labels, file2pred_score, DEs,\
+def eval_instance_argoverse(batch_size, args: config.Args, pred, pred_score, mapping, file2pred, file2labels, file2pred_score, DEs,\
                              submission_nuscenes, iter_bar=None, eval_instance_num=0):
     for i in range(batch_size):
         a_pred = pred[i]
@@ -68,7 +68,7 @@ def eval_instance_argoverse(batch_size, args, pred, pred_score, mapping, file2pr
     return eval_instance_num, submission_nuscenes
 
 
-def do_eval(args):
+def do_eval(args: config.Args):
     device = torch.device(
         "cuda" if torch.cuda.is_available() and not args.no_cuda else "cpu")
 
