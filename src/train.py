@@ -103,7 +103,7 @@ def train_one_epoch(model, iter_bar, optimizer, device, args: config.Args, i_epo
             train_epoch = args.other_params['stage-two-epoch']
         else:
             train_epoch = args.num_train_epochs
-        if train_epoch > 16 and (i_epoch+1)%10==0:
+        if train_epoch > 16 and ((i_epoch+1)%10==0 or i_epoch == 0):
             model_to_save = model.module if hasattr(
                 model, 'module') else model  # Only save the model it-self
             output_model_file = os.path.join(
