@@ -127,6 +127,11 @@ class GRUDecoder(nn.Module):
             pass
         max_vector_num = lane_states_batch.shape[1]
         batch_size = len(mapping)
+        src_attention_mask_lane = torch.zeros([batch_size, lane_states_batch.shape[1]], device=device) # [N, max_len]
+        for i in range(batch_size):
+            assert lane_states_length[i] > 0
+            src_attention_mask_lane[i, :lane_states_length[i]] = 1
+        src_attention_mask_lane = src_attention_mask_lane == 0
         lane_states_batch = lane_states_batch.permute(1, 0, 2) # [max_len, N, H]
         dense_lane_pred = compute_dense_lane_scores() # [max_len, N, H]
         dense_lane_pred = dense_lane_pred.permute(1, 0, 2) # [N, max_len, H]
