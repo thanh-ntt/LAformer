@@ -106,7 +106,11 @@ class GRUDecoder(nn.Module):
             lane_states_length (tensor): [N]
             element_hidden_states (tensor): [N]
             global_hidden_states (tensor): [N]
-            device (device): device"""
+            device (device): device
+
+        Returns:
+            tensor: candidate lane encodings C = ConCat{c_{1:k}, s^_{1:k}}^{t_f}_{t=1}
+        """
         def compute_dense_lane_scores():
             lane_states_batch_attention = lane_states_batch + self.dense_label_cross_attention(
                 lane_states_batch, element_hidden_states.unsqueeze(0), tgt_key_padding_mask=src_attention_mask_lane)
@@ -123,11 +127,6 @@ class GRUDecoder(nn.Module):
             pass
         max_vector_num = lane_states_batch.shape[1]
         batch_size = len(mapping)
-        src_attention_mask_lane = torch.zeros([batch_size, lane_states_batch.shape[1]], device=device) # [N, max_len]
-        for i in range(batch_size):
-            assert lane_states_length[i] > 0
-            src_attention_mask_lane[i, :lane_states_length[i]] = 1
-        src_attention_mask_lane = src_attention_mask_lane == 0
         lane_states_batch = lane_states_batch.permute(1, 0, 2) # [max_len, N, H]
         dense_lane_pred = compute_dense_lane_scores() # [max_len, N, H]
         dense_lane_pred = dense_lane_pred.permute(1, 0, 2) # [N, max_len, H]
@@ -174,7 +173,11 @@ class GRUDecoder(nn.Module):
             dense_lane_topk = self.dense_lane_aware\
             (0, mapping, lane_states_batch, lane_states_length, local_embed, inputs_lengths, global_embed, device, loss) # [N, dense*mink, hidden_size + 1]
             dense_lane_topk = dense_lane_topk.permute(1, 0, 2)  # [dense*mink, N, hidden_size + 1]
-            dense_lane_topk = self.proj_topk(dense_lane_topk) # [dense*mink, N, hidden_size]   # paper concat dense_lane_topk directly, but this use MLP (proj_topk)
+            # TODO: (paper) "and the candidate lane encodings C as the key and value vectors" => Why need projection proj_topk?
+            dense_lane_topk = self.proj_topk(dense_lane_topk) # [dense*mink, N, hidden_size]
+            # h_{i,att}: global_embed_att = cross_attention(Q: h_i, K,V: C)
+            # Q: global_embed = the target agent’s past trajectory encoding h_i
+            # K, V: dense_lane_topk = candidate lane encodings C = ConCat{c_{1:k}, s^_{1:k}}^{t_f}_{t=1}
             global_embed_att = global_embed + self.aggregation_cross_att(global_embed.unsqueeze(0), dense_lane_topk).squeeze(0) # [N, D]
             global_embed = torch.cat([global_embed, global_embed_att], dim=-1) # [N, 2*D]
         local_embed = local_embed.repeat(self.num_modes, 1, 1)  # [F, N, D]

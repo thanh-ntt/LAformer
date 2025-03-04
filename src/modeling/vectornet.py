@@ -175,5 +175,5 @@ class VectorNet(nn.Module):
         element_states_batch = []
         for i in range(batch_size):
             element_states_batch.append(torch.cat([agent_states_batch[i], lane_states_batch[i]], dim=0))
-        return element_states_batch, lane_states_batch
+        return element_states_batch, lane_states_batch  # h_i, c_j
 
