@@ -112,7 +112,8 @@ class GRUDecoder(nn.Module):
         Args:
             mapping (list): data mapping
             lane_states_batch (tensor): [batch, seq_len, feature]
-            lane_states_length (list): len = batch
+            lane_states_length (list): lengths of the lane-state lists for each batch (max_lane_states_length)
+                len = batch
             element_hidden_states (tensor): [batch, feature]
             global_hidden_states (tensor): [batch, feature]
 
@@ -128,8 +129,7 @@ class GRUDecoder(nn.Module):
         """
         print(f'lane_states_batch.shape: {lane_states_batch.shape}')
         print(f'len(lane_states_length): {len(lane_states_length)}')
-        print(f'lane_states_length[0].shape: {lane_states_length[0].shape}')
-        print(f'lane_states_length[1].shape: {lane_states_length[1].shape}')
+        print(f'lane_states_length: {lane_states_length}')
         print(f'element_hidden_states.shape: {element_hidden_states.shape}')
         print(f'global_hidden_states.shape: {global_hidden_states.shape}')
         def compute_dense_lane_scores():

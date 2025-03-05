@@ -193,6 +193,7 @@ class VectorNet(nn.Module):
         print(f'[encoder] element_states_batch[0].shape: {element_states_batch[0].shape}') # <= different value in different iterations
         print(f'[encoder] element_states_batch[1].shape: {element_states_batch[1].shape}') # <= different value in different iterations
         print(f'[encoder] lane_states_batch.shape: {lane_states_batch.shape}')
+        print(f'[encoder] lane_states_batch.shape[1]: {lane_states_batch.shape[1]}')
         # len(element_states_batch) = batch
         #   element_states_batch[i].shape = [max_agent_states_length + max_lane_states_length, feature]
         # lane_states_batch.shape = [batch, max_lane_states_length, feature]
