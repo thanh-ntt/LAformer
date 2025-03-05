@@ -111,32 +111,35 @@ class GRUDecoder(nn.Module):
         """dense lane aware
         Args:
             mapping (list): data mapping
-            lane_states_batch (tensor): [max_len, N]
-                shape [batch_size, seq_len, hidden_size]
-            lane_states_length (list): [N]
-                len: batch_size
-            element_hidden_states (tensor): [N]
-                shape [batch_size, hidden_size]
-            global_hidden_states (tensor): [N]
-                shape [batch_size, hidden_size]
+            lane_states_batch (tensor): [batch, seq_len, feature]
+            lane_states_length (list): len = batch
+            element_hidden_states (tensor): [batch, feature]
+            global_hidden_states (tensor): [batch, feature]
 
         Tensor shape explanation:
-            N: batch_size * hidden size (?)
+            N / feature: hidden_size (size of latent vector)
                 TODO: if N is hidden size, why does compute_dense_lane_scores() return Tensor shape [max_len, N, H]?
                         ^ Shouldn't this be shape [max_len, H] only? As in it's a scalar predicted score?
-            seq_len: max_len / max_num_lanes / maximum number of lane states in encoder
-                Each lane has different number (e.g. 62, 88, ...); (default) max = 290
-                Code: `lanes = all_lane_states_unspilited[batch_split_lane[i][0]:batch_split_lane[i][1]]`
-            H: batch size
+            seq_len: max_len / max_num_lanes / max_lane_states_length / maximum number of lane states from encoder
+                Each lane has different number (e.g. 62, 88, ...); Each iteration has different max_lane_states_length (e.g. 290, 289, 292, ...)
 
         Returns:
             tensor: candidate lane encodings C = ConCat{c_{1:k}, s^_{1:k}}^{t_f}_{t=1}
         """
         print(f'lane_states_batch.shape: {lane_states_batch.shape}')
         print(f'len(lane_states_length): {len(lane_states_length)}')
+        print(f'lane_states_length[0].shape: {lane_states_length[0].shape}')
+        print(f'lane_states_length[1].shape: {lane_states_length[1].shape}')
         print(f'element_hidden_states.shape: {element_hidden_states.shape}')
         print(f'global_hidden_states.shape: {global_hidden_states.shape}')
         def compute_dense_lane_scores():
+            """predict score of the j-th lane segment at future time step t
+
+            Returns:
+                tensor: [seq_len, batch, future_steps]
+                    seq_len (max_lane_states_length) varies between iterations
+                    future_steps: t_f (in section 3.3)
+            """
             # h_{i,att}: global_embed_att = cross_attention(Q: h_i, K,V: C)
             # Q: lane_states_batch = lane encoding c_j
             # K, V: element_hidden_states = agent motion encoding h_i
@@ -151,12 +154,13 @@ class GRUDecoder(nn.Module):
             #       TODO: why need `torch.cat([global_hidden_states.unsqueeze(0).expand(lane_states_batch.shape)`?
             #   2. lane_states_batch: hidden states of lanes (lane encoding c_j)
             #   3. lane_states_batch_attention: the predicted score of the j-th lane segment at t - A_{i,j}
-            # dense_lane_scores.shape = [max_num_lanes, batch_size, t]
-            #   t: future_frame_num (default value = 12)
+            # dense_lane_scores.shape = [max_num_lanes, batch_size, t_f]
+            #   t_f: future_steps / future_frame_num (default value = 12)
             dense_lane_scores = self.dense_lane_decoder(torch.cat([global_hidden_states.unsqueeze(0).expand(
                 lane_states_batch.shape), lane_states_batch, lane_states_batch_attention], dim=-1)) # [max_len, N, H]
             # s^_{j,t} = softmax(\theta{ h_i, c_j, A_{i,j} })
             print(f'(1) dense_lane_scores.shape: {dense_lane_scores.shape}')
+            # lane-scoring head
             dense_lane_scores = F.log_softmax(dense_lane_scores, dim=0)
             print(f'(2) dense_lane_scores.shape: {dense_lane_scores.shape}')
             return dense_lane_scores
