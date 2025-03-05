@@ -44,7 +44,7 @@ class GRUDecoder(nn.Module):
         self.num_modes = args.mode_num
         self.min_scale = min_scale
         self.args = args
-        self.dense = args.future_frame_num
+        self.future_frame_num = args.future_frame_num
         self.z_size = args.z_size
         self.smothl1 = torch.nn.SmoothL1Loss(reduction='none')
         self.gru = nn.GRU(input_size=self.input_size,
@@ -86,7 +86,7 @@ class GRUDecoder(nn.Module):
                                         nn.ReLU(inplace=True))  
             decoder_layer_dense_label = nn.TransformerDecoderLayer(d_model=self.hidden_size, nhead=32, dim_feedforward=self.hidden_size)
             self.dense_label_cross_attention = nn.TransformerDecoder(decoder_layer_dense_label, num_layers=1)
-            self.dense_lane_decoder = DecoderResCat(self.hidden_size, self.hidden_size * 3, out_features=self.dense)
+            self.dense_lane_decoder = DecoderResCat(self.hidden_size, self.hidden_size * 3, out_features=self.future_frame_num)
             self.proj_topk = MLP(self.hidden_size+1, self.hidden_size)
             decoder_layer_aggregation = nn.TransformerDecoderLayer(d_model=self.hidden_size, nhead=32, dim_feedforward=self.hidden_size)
             self.aggregation_cross_att= nn.TransformerDecoder(decoder_layer_aggregation, num_layers=1)
@@ -108,7 +108,7 @@ class GRUDecoder(nn.Module):
 
     def dense_lane_aware(self, i, mapping, lane_states_batch, lane_states_length, element_hidden_states, \
                             element_hidden_states_lengths, global_hidden_states, device, loss):
-        """dense lane aware
+        """future_frame_num lane aware
         Args:
             mapping (list): data mapping
             lane_states_batch (tensor): hidden states of lanes
@@ -141,10 +141,13 @@ class GRUDecoder(nn.Module):
         def compute_dense_lane_scores():
             """predict score of the j-th lane segment at future time step t
 
-                Question: Why does compute_dense_lane_scores() return Tensor shape [max_len, N, H]?
+                Question: Why does compute_dense_lane_scores() return Tensor shape [seq_len, N, H]?
                     This fn returns a scalar (predicted score) of j-th lane segment at time step t
-                        N * max_len (j-th lane segment)
+                        N * seq_len (j-th lane segment)
                         H * (time step t)
+
+            Tensor shape explanation:
+                seq_len: max_len = lane_seq_len = max_lane_states_length
 
             Returns:
                 tensor: [seq_len, batch, future_steps]
@@ -162,6 +165,7 @@ class GRUDecoder(nn.Module):
             lane_states_batch_attention = lane_states_batch + self.dense_label_cross_attention(
                 lane_states_batch, element_hidden_states.unsqueeze(0), tgt_key_padding_mask=src_attention_mask_lane)
             print(f'lane_states_batch_attention.shape: {lane_states_batch_attention.shape}')
+
             # self.dense_lane_decoder: \theta = 2-layer MLP to process:
             #   1. h_i: agent motion encoding
             #       Why need `expand(lane_states_batch.shape), lane_states_batch, lane_states_batch_attention], dim=-1)`?
@@ -174,12 +178,14 @@ class GRUDecoder(nn.Module):
             #   t_f: future_steps / future_frame_num (default value = 12)
             dense_lane_scores = self.dense_lane_decoder(torch.cat([global_hidden_states.unsqueeze(0).expand(
                 lane_states_batch.shape), lane_states_batch, lane_states_batch_attention], dim=-1)) # [max_len, N, H]
-            # s^_{j,t} = softmax(\theta{ h_i, c_j, A_{i,j} })
             print(f'(1) dense_lane_scores.shape: {dense_lane_scores.shape}')
+
             # lane-scoring head
+            # s^_{j,t} = softmax(\theta{ h_i, c_j, A_{i,j} }) <= this does not change shape of the tensor
             dense_lane_scores = F.log_softmax(dense_lane_scores, dim=0)
             print(f'(2) dense_lane_scores.shape: {dense_lane_scores.shape}')
             return dense_lane_scores # [seq_len, batch, future_steps] = [max_len, N, H]
+
         def check_rules_lane_segments():
             # TODO: return list of indices of lane segments that violate 1 or many rules
             # Try this with topk lane segments first
@@ -194,54 +200,64 @@ class GRUDecoder(nn.Module):
             assert lane_states_length[i] > 0
             src_attention_mask_lane[i, :lane_states_length[i]] = 1
         src_attention_mask_lane = src_attention_mask_lane == 0
-        lane_states_batch = lane_states_batch.permute(1, 0, 2) # [max_len, N, H]
+        lane_states_batch = lane_states_batch.permute(1, 0, 2) # [max_len, N, feature]
         print(f'lane_states_batch.shape: {lane_states_batch.shape}')
         dense_lane_pred = compute_dense_lane_scores() # [max_len, N, H]
         print(f'(1) dense_lane_pred.shape: {dense_lane_pred.shape}')
         dense_lane_pred = dense_lane_pred.permute(1, 0, 2) # [N, max_len, H]
         print(f'(2) dense_lane_pred.shape: {dense_lane_pred.shape}')
-        lane_states_batch = lane_states_batch.permute(1, 0, 2) # [N, max_len, H]
-        dense  = self.dense
+        lane_states_batch = lane_states_batch.permute(1, 0, 2) # [N, max_len, feature]
+        future_frame_num  = self.future_frame_num
         dense_lane_pred =  dense_lane_pred.permute(0, 2, 1) # [N, H, max_len]
         print(f'(3) dense_lane_pred.shape: {dense_lane_pred.shape}')
         dense_lane_pred = dense_lane_pred.contiguous().view(-1, max_vector_num)  # [N*H, max_len]
         print(f'(4) dense_lane_pred.shape: {dense_lane_pred.shape}')
+
         if self.args.do_train:
-            dense_lane_targets = torch.zeros([batch_size, dense], device=device, dtype=torch.long)
+            # compute L_lane loss (cross-entropy)
+            dense_lane_targets = torch.zeros([batch_size, future_frame_num], device=device, dtype=torch.long)
             for i in range(batch_size):
                 dense_lane_targets[i, :] = torch.tensor(np.array(mapping[i]['dense_lane_labels']), dtype=torch.long, device=device)
             lane_loss_weight = self.args.lane_loss_weight  # \lambda_1
             dense_lane_targets = dense_lane_targets.view(-1) # [N*H]
             loss += lane_loss_weight*F.nll_loss(dense_lane_pred, dense_lane_targets, reduction='none').\
-                    view(batch_size, dense).sum(dim=1) # cross-entropy loss L_lane
+                    view(batch_size, future_frame_num).sum(dim=1) # cross-entropy loss L_lane
+
         mink = self.args.topk
-        dense_lane_topk = torch.zeros((dense_lane_pred.shape[0], mink, self.hidden_size), device=device) # [N*dense, mink, hidden_size]
+        dense_lane_topk = torch.zeros((dense_lane_pred.shape[0], mink, self.hidden_size), device=device) # [N*H, mink, hidden_size]
         print(f'(1) dense_lane_topk.shape: {dense_lane_topk.shape}')
-        dense_lane_topk_scores = torch.zeros((dense_lane_pred.shape[0], mink), device=device)   # [N*dense, mink]
+        dense_lane_topk_scores = torch.zeros((dense_lane_pred.shape[0], mink), device=device)   # [N*H, mink]
+        print(f'dense_lane_topk_scores.shape: {dense_lane_topk_scores.shape}')
         # dense_lane_pred = dense_lane_pred.exp()
         for i in range(dense_lane_topk_scores.shape[0]):
-            idxs_lane = i // dense
+            idxs_lane = i // future_frame_num
             k = min(mink, lane_states_length[idxs_lane])
             _, idxs_topk = torch.topk(dense_lane_pred[i], k) # select top k=2 (or 4) lane segments to guide decoder
-            dense_lane_topk[i][:k] = lane_states_batch[idxs_lane, idxs_topk] # [N*dense, mink, hidden_size]
-            dense_lane_topk_scores[i][:k] = dense_lane_pred[i][idxs_topk] # [N*dense, mink]
-        dense_lane_topk = torch.cat([dense_lane_topk, dense_lane_topk_scores.unsqueeze(-1)], dim=-1) # [N*dense, mink, hidden_size + 1]
+            dense_lane_topk[i][:k] = lane_states_batch[idxs_lane, idxs_topk] # [N*future_frame_num, mink, hidden_size]
+            dense_lane_topk_scores[i][:k] = dense_lane_pred[i][idxs_topk] # [N*future_frame_num, mink]
+        dense_lane_topk = torch.cat([dense_lane_topk, dense_lane_topk_scores.unsqueeze(-1)], dim=-1) # [N*future_frame_num, mink, hidden_size + 1]
         print(f'(2) dense_lane_topk.shape: {dense_lane_topk.shape}')
-        dense_lane_topk = dense_lane_topk.view(batch_size, dense*mink, self.hidden_size + 1) # [N, sense*mink, hidden_size + 1]
+        dense_lane_topk = dense_lane_topk.view(batch_size, future_frame_num*mink, self.hidden_size + 1) # [N, sense*mink, hidden_size + 1]
         print(f'(3) dense_lane_topk.shape: {dense_lane_topk.shape}')
-        return dense_lane_topk # [N, dense*mink, hidden_size + 1]
+        return dense_lane_topk # [N, future_frame_num*mink, hidden_size + 1]
 
     def forward(self, mapping: List[Dict], batch_size, lane_states_batch, lane_states_length, inputs: Tensor,
                 inputs_lengths: List[int], hidden_states: Tensor, device) -> Tuple[torch.Tensor, torch.Tensor]:
         """lane-aware estimation + multimodal conditional decoder
         Args:
             lane_states_batch: hidden states of lanes
-                [batch_size, max_num_lanes, hidden_size]
+                [batch, lane_seq_len, feature]
+                    batch: train_batch_size
+                    lane_seq_len: max_lane_states_length
+                    feature: hidden_size
                 ^ c_j
                 This is not encoded by global graph
 
             inputs: hidden states of agents before encoding by global graph
-                [batch_size, sequence_length, hidden_size]
+                [batch, seq_len, feature]
+                    batch: train_batch_size
+                    seq_len: max_agent_states_length + max_lane_states_length
+                    feature: hidden_size
                 ^ h_i (BEFORE global graph)
                 This actually also contains the hidden states of lanes - encoder code:
                     `element_states_batch.append(torch.cat([agent_states_batch[i], lane_states_batch[i]], dim=0))`
@@ -250,7 +266,10 @@ class GRUDecoder(nn.Module):
                         Namely, h_i = ConCat[h_i, c_j] for j ∈ {1, ..., N_lane}
 
             hidden_states: hidden states of agents after encoding by global graph
-                [
+                [batch, seq_len, feature]
+                    batch: train_batch_size
+                    seq_len: max_agent_states_length + max_lane_states_length
+                    feature: hidden_size
                 ^ h_i (AFTER global graph)
 
         Other variables:
