@@ -129,7 +129,7 @@ class GRUDecoder(nn.Module):
             tensor: candidate lane encodings C = ConCat{c_{1:k}, s^_{1:k}}^{t_f}_{t=1}
         """
         print(f'lane_states_batch.shape: {lane_states_batch.shape}')
-        print(f'lane_states_length.shape: {lane_states_length.shape}')
+        print(f'len(lane_states_length): {len(lane_states_length)}')
         print(f'element_hidden_states.shape: {element_hidden_states.shape}')
         print(f'global_hidden_states.shape: {global_hidden_states.shape}')
         def compute_dense_lane_scores():
