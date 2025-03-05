@@ -183,6 +183,8 @@ class VectorNet(nn.Module):
         for i in range(batch_size):
             element_states_batch.append(torch.cat([agent_states_batch[i], lane_states_batch[i]], dim=0))
         print(f'[encoder] len(element_states_batch): {len(element_states_batch)}')
+        print(f'[encoder] element_states_batch[0].shape: {element_states_batch[0].shape}')
+        print(f'[encoder] element_states_batch[1].shape: {element_states_batch[1].shape}')
         print(f'[encoder] lane_states_batch.shape: {lane_states_batch.shape}')
         return element_states_batch, lane_states_batch  # h_i, c_j
 

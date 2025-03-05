@@ -112,7 +112,7 @@ class GRUDecoder(nn.Module):
         Args:
             mapping (list): data mapping
             lane_states_batch (tensor): [max_len, N]
-                shape [batch_size, max_num_lanes, hidden_size]
+                shape [batch_size, seq_len, hidden_size]
             lane_states_length (list): [N]
                 len: batch_size
             element_hidden_states (tensor): [N]
@@ -124,7 +124,9 @@ class GRUDecoder(nn.Module):
             N: batch_size * hidden size (?)
                 TODO: if N is hidden size, why does compute_dense_lane_scores() return Tensor shape [max_len, N, H]?
                         ^ Shouldn't this be shape [max_len, H] only? As in it's a scalar predicted score?
-            max_len: max_num_lanes
+            seq_len: max_len / max_num_lanes / maximum number of lane states in encoder
+                Each lane has different number (e.g. 62, 88, ...); (default) max = 290
+                Code: `lanes = all_lane_states_unspilited[batch_split_lane[i][0]:batch_split_lane[i][1]]`
             H: batch size
 
         Returns:
