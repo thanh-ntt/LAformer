@@ -153,6 +153,8 @@ class VectorNet(nn.Module):
             lanes = all_lane_states_unspilited[batch_split_lane[i][0]:batch_split_lane[i][1]]
             agent_states_batch.append(agents)
             lane_states_batch.append(lanes)
+        print(f'[encoder] len(agent_states_batch): {len(agent_states_batch)}')
+        print(f'[encoder] len(lane_states_batch): {len(lane_states_batch)}')
         agent_states_batch, lengths = utils.merge_tensors(agent_states_batch, device, args.hidden_size)
         lane_states_batch, lengths_lane = utils.merge_tensors_lane(lane_states_batch, device, args.hidden_size)
         src_attention_mask_lane = torch.zeros([batch_size, lane_states_batch.shape[1]], device=device)
