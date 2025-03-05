@@ -35,6 +35,7 @@ class ModelMain(nn.Module):
         all_element_states_batch, lane_states_batch = self.encoder.forward(mapping, vector_matrix, polyline_spans, device, batch_size)
         # Global interacting graph
         inputs, inputs_lengths = utils.merge_tensors(all_element_states_batch, device=device)
+        print(f'[main] inputs.shape: {inputs.shape}')
         print(f'[main] len(lane_states_batch): {len(lane_states_batch)}')
         print(f'[main] lane_states_batch[0].shape: {lane_states_batch[0].shape}')
         print(f'[main] lane_states_batch[1].shape: {lane_states_batch[1].shape}')
@@ -45,6 +46,7 @@ class ModelMain(nn.Module):
         for i, length in enumerate(inputs_lengths):
             attention_mask[i][:length][:length].fill_(1)
         global_hidden_states = self.global_graph(inputs, attention_mask, mapping)
+        print(f'[main] global_hidden_states.shape: {global_hidden_states.shape}')
 
         # Decoder
         return self.decoder(mapping, batch_size, lane_states_batch, lane_states_length, inputs, inputs_lengths, global_hidden_states, device)
