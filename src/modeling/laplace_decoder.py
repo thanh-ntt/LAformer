@@ -15,6 +15,15 @@ from modeling.motion_refinement import trajectory_refinement
 from utils_files.loss import *
 
 class DecoderResCat(nn.Module):
+    """
+    DecoderResCat is a class name that likely stands for "Decoder with Residual Concatenation".
+    This class implements a neural network module that uses a Multi-Layer Perceptron (MLP)
+    to process input features and then concatenates the original input features with the output
+    of the MLP before passing them through a fully connected layer.
+
+    This concatenation can be seen as a form of residual connection,
+    which helps in preserving the original input information while adding the learned transformations from the MLP.
+    """
     def __init__(self, hidden_size, in_features, out_features=60):
         super(DecoderResCat, self).__init__()
         self.mlp = MLP(in_features, hidden_size)
@@ -103,19 +112,42 @@ class GRUDecoder(nn.Module):
         Args:
             mapping (list): data mapping
             lane_states_batch (tensor): [max_len, N]
+                (from forward fn) lane_states_batch: hidden states of lanes (shape [batch_size, max_num_lanes, hidden_size])
             lane_states_length (tensor): [N]
             element_hidden_states (tensor): [N]
             global_hidden_states (tensor): [N]
             device (device): device
 
+        Tensor shape explanation:
+            N: hidden size
+                TODO: if N is hidden size, why does compute_dense_lane_scores() return Tensor shape [max_len, N, H]?
+                        ^ Shouldn't this be shape [max_len, H] only? As in it's a scalar predicted score?
+            max_len: max_num_lanes
+            H: batch size
+
         Returns:
             tensor: candidate lane encodings C = ConCat{c_{1:k}, s^_{1:k}}^{t_f}_{t=1}
         """
+        print(f'lane_states_batch.shape: {lane_states_batch.shape}')
+        print(f'lane_states_length.shape: {lane_states_length.shape}')
+        print(f'element_hidden_states.shape: {element_hidden_states.shape}')
+        print(f'global_hidden_states.shape: {global_hidden_states.shape}')
         def compute_dense_lane_scores():
+            # h_{i,att}: global_embed_att = cross_attention(Q: h_i, K,V: C)
+            # Q: lane_states_batch = lane encoding c_j
+            # K, V: element_hidden_states = agent motion encoding h_i
+            # A_{i,j} = softmax(...) = Scaled Dot Product Attention (K,V,Q above)
+            # TODO: where are the linear projections (of both K,V and Q)?
             lane_states_batch_attention = lane_states_batch + self.dense_label_cross_attention(
                 lane_states_batch, element_hidden_states.unsqueeze(0), tgt_key_padding_mask=src_attention_mask_lane)
+            # self.dense_lane_decoder: \theta = 2-layer MLP to process:
+            #   1. agent motion encoding h_i
+            #       TODO: why need `torch.cat([global_hidden_states.unsqueeze(0).expand(lane_states_batch.shape)`?
+            #   2. lane_states_batch: hidden states of lanes (lane encoding c_j)
+            #   3. lane_states_batch_attention: the predicted score of the j-th lane segment at t - A_{i,j}
             dense_lane_scores = self.dense_lane_decoder(torch.cat([global_hidden_states.unsqueeze(0).expand(
                 lane_states_batch.shape), lane_states_batch, lane_states_batch_attention], dim=-1)) # [max_len, N, H]
+            # s^_{j,t} = softmax(\theta{ h_i, c_j, A_{i,j} })
             dense_lane_scores = F.log_softmax(dense_lane_scores, dim=0)
             return dense_lane_scores
         def check_rules_lane_segments():
