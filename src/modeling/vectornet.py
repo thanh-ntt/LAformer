@@ -154,14 +154,15 @@ class VectorNet(nn.Module):
             agent_states_batch.append(agents)
             lane_states_batch.append(lanes)
         print(f'[encoder] len(agent_states_batch): {len(agent_states_batch)}')
-        print(f'[encoder] agent_states_batch[0].shape: {agent_states_batch[0].shape}') # [4, 64]
-        print(f'[encoder] agent_states_batch[1].shape: {agent_states_batch[1].shape}') # [27, 64]
+        print(f'[encoder] agent_states_batch[0].shape: {agent_states_batch[0].shape}') # [4, 64] <= different value in different iterations
+        print(f'[encoder] agent_states_batch[1].shape: {agent_states_batch[1].shape}') # [27, 64] <= different value in different iterations
         print(f'[encoder] len(lane_states_batch): {len(lane_states_batch)}')
-        print(f'[encoder] lane_states_batch[0].shape: {lane_states_batch[0].shape}') # [62, 64]
-        print(f'[encoder] lane_states_batch[1].shape: {lane_states_batch[1].shape}') # [88, 64]
+        print(f'[encoder] lane_states_batch[0].shape: {lane_states_batch[0].shape}') # [62, 64] <= different value in different iterations
+        print(f'[encoder] lane_states_batch[1].shape: {lane_states_batch[1].shape}') # [88, 64] <= different value in different iterations
         agent_states_batch, lengths = utils.merge_tensors(agent_states_batch, device, args.hidden_size)
+        print(f'[encoder] (1) agent_states_batch.shape: {agent_states_batch.shape}')
         lane_states_batch, lengths_lane = utils.merge_tensors_lane(lane_states_batch, device, args.hidden_size)
-        print(f'[encoder] lane_states_batch.shape: {lane_states_batch.shape}')
+        print(f'[encoder] (1) lane_states_batch.shape: {lane_states_batch.shape}')
         src_attention_mask_lane = torch.zeros([batch_size, lane_states_batch.shape[1]], device=device)
         src_attention_mask_agent = torch.zeros([batch_size, agent_states_batch.shape[1]], device=device)
         for i in range(batch_size):
@@ -178,13 +179,17 @@ class VectorNet(nn.Module):
         agent_states_batch = agent_states_batch+ self.laneGCN_L2A(agent_states_batch, lane_states_batch, \
                                             memory_key_padding_mask=src_attention_mask_lane, tgt_key_padding_mask=src_attention_mask_agent)
         agent_states_batch = agent_states_batch.permute(1, 0, 2)  # [batch, seq_len, feature]
+        print(f'[encoder] (2) agent_states_batch.shape: {agent_states_batch.shape}')
         lane_states_batch = lane_states_batch.permute(1, 0, 2)  # [batch, seq_len, feature]
+        print(f'[encoder] (2) lane_states_batch.shape: {lane_states_batch.shape}')
         element_states_batch = []
         for i in range(batch_size):
             element_states_batch.append(torch.cat([agent_states_batch[i], lane_states_batch[i]], dim=0))
         print(f'[encoder] len(element_states_batch): {len(element_states_batch)}')
-        print(f'[encoder] element_states_batch[0].shape: {element_states_batch[0].shape}')
-        print(f'[encoder] element_states_batch[1].shape: {element_states_batch[1].shape}')
+        print(f'[encoder] element_states_batch[0].shape: {element_states_batch[0].shape}') # <= different value in different iterations
+        print(f'[encoder] element_states_batch[1].shape: {element_states_batch[1].shape}') # <= different value in different iterations
         print(f'[encoder] lane_states_batch.shape: {lane_states_batch.shape}')
+        # len(element_states_batch) = batch
+        # element_states_batch[0].shape =
         return element_states_batch, lane_states_batch  # h_i, c_j
 
