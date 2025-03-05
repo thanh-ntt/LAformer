@@ -140,6 +140,7 @@ class GRUDecoder(nn.Module):
             # K, V: element_hidden_states = agent motion encoding h_i
             # A_{i,j} = softmax(...) = Scaled Dot Product Attention (K,V,Q above)
             # TODO: where are the linear projections (of both K,V and Q)?
+            # lane_states_batch_attention.shape = [max_num_lanes, batch_size, hidden_size]
             lane_states_batch_attention = lane_states_batch + self.dense_label_cross_attention(
                 lane_states_batch, element_hidden_states.unsqueeze(0), tgt_key_padding_mask=src_attention_mask_lane)
             print(f'lane_states_batch_attention.shape: {lane_states_batch_attention.shape}')
@@ -148,6 +149,8 @@ class GRUDecoder(nn.Module):
             #       TODO: why need `torch.cat([global_hidden_states.unsqueeze(0).expand(lane_states_batch.shape)`?
             #   2. lane_states_batch: hidden states of lanes (lane encoding c_j)
             #   3. lane_states_batch_attention: the predicted score of the j-th lane segment at t - A_{i,j}
+            # dense_lane_scores.shape = [max_num_lanes, batch_size, t]
+            #   t: future_frame_num (default value = 12)
             dense_lane_scores = self.dense_lane_decoder(torch.cat([global_hidden_states.unsqueeze(0).expand(
                 lane_states_batch.shape), lane_states_batch, lane_states_batch_attention], dim=-1)) # [max_len, N, H]
             # s^_{j,t} = softmax(\theta{ h_i, c_j, A_{i,j} })
