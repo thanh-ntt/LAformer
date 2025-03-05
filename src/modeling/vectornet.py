@@ -154,13 +154,14 @@ class VectorNet(nn.Module):
             agent_states_batch.append(agents)
             lane_states_batch.append(lanes)
         print(f'[encoder] len(agent_states_batch): {len(agent_states_batch)}')
-        print(f'[encoder] agent_states_batch[0].shape: {agent_states_batch[0].shape}')
-        print(f'[encoder] agent_states_batch[1].shape: {agent_states_batch[1].shape}')
+        print(f'[encoder] agent_states_batch[0].shape: {agent_states_batch[0].shape}') # [4, 64]
+        print(f'[encoder] agent_states_batch[1].shape: {agent_states_batch[1].shape}') # [27, 64]
         print(f'[encoder] len(lane_states_batch): {len(lane_states_batch)}')
-        print(f'[encoder] lane_states_batch[0].shape: {lane_states_batch[0].shape}')
-        print(f'[encoder] lane_states_batch[1].shape: {lane_states_batch[1].shape}')
+        print(f'[encoder] lane_states_batch[0].shape: {lane_states_batch[0].shape}') # [62, 64]
+        print(f'[encoder] lane_states_batch[1].shape: {lane_states_batch[1].shape}') # [88, 64]
         agent_states_batch, lengths = utils.merge_tensors(agent_states_batch, device, args.hidden_size)
         lane_states_batch, lengths_lane = utils.merge_tensors_lane(lane_states_batch, device, args.hidden_size)
+        print(f'[encoder] lane_states_batch.shape: {lane_states_batch.shape}')
         src_attention_mask_lane = torch.zeros([batch_size, lane_states_batch.shape[1]], device=device)
         src_attention_mask_agent = torch.zeros([batch_size, agent_states_batch.shape[1]], device=device)
         for i in range(batch_size):
