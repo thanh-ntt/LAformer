@@ -111,16 +111,22 @@ class GRUDecoder(nn.Module):
         """dense lane aware
         Args:
             mapping (list): data mapping
-            lane_states_batch (tensor): [batch, seq_len, feature]
+            lane_states_batch (tensor): hidden states of lanes
+                shape [batch, seq_len, feature]
             lane_states_length (list): lengths of the lane-state lists for each batch (max_lane_states_length)
                 len = batch
+                all elements in lane_states_length are the same = lane_states_batch.shape[1] = seq_len
             element_hidden_states (tensor): [batch, feature]
             global_hidden_states (tensor): [batch, feature]
+                global_hidden_states is the output of the Global Interaction Graph
+                global_hidden_states contains both agent & lane states
+                ^ check model_main.py's forward fn
+                    GlobalGraph has nn.Linear for all K,Q,V => linear projection
 
         Tensor shape explanation:
-            N / feature: hidden_size (size of latent vector)
-                TODO: if N is hidden size, why does compute_dense_lane_scores() return Tensor shape [max_len, N, H]?
-                        ^ Shouldn't this be shape [max_len, H] only? As in it's a scalar predicted score?
+            feature: hidden_size (size of latent vector)
+            N: batch size
+            H: t_f = number of future time steps (default = 12)
             seq_len: max_len / max_num_lanes / max_lane_states_length / maximum number of lane states from encoder
                 Each lane has different number (e.g. 62, 88, ...); Each iteration has different max_lane_states_length (e.g. 290, 289, 292, ...)
 
@@ -135,25 +141,35 @@ class GRUDecoder(nn.Module):
         def compute_dense_lane_scores():
             """predict score of the j-th lane segment at future time step t
 
+                Question: Why does compute_dense_lane_scores() return Tensor shape [max_len, N, H]?
+                    This fn returns a scalar (predicted score) of j-th lane segment at time step t
+                        N * max_len (j-th lane segment)
+                        H * (time step t)
+
             Returns:
                 tensor: [seq_len, batch, future_steps]
                     seq_len (max_lane_states_length) varies between iterations
                     future_steps: t_f (in section 3.3)
             """
+            # self.dense_label_cross_attention: scaled dot product attention block
             # h_{i,att}: global_embed_att = cross_attention(Q: h_i, K,V: C)
             # Q: lane_states_batch = lane encoding c_j
             # K, V: element_hidden_states = agent motion encoding h_i
             # A_{i,j} = softmax(...) = Scaled Dot Product Attention (K,V,Q above)
             # TODO: where are the linear projections (of both K,V and Q)?
             # lane_states_batch_attention.shape = [max_num_lanes, batch_size, hidden_size]
+            # TODO: why the element-wise addiction '+'?
             lane_states_batch_attention = lane_states_batch + self.dense_label_cross_attention(
                 lane_states_batch, element_hidden_states.unsqueeze(0), tgt_key_padding_mask=src_attention_mask_lane)
             print(f'lane_states_batch_attention.shape: {lane_states_batch_attention.shape}')
             # self.dense_lane_decoder: \theta = 2-layer MLP to process:
-            #   1. agent motion encoding h_i
-            #       TODO: why need `torch.cat([global_hidden_states.unsqueeze(0).expand(lane_states_batch.shape)`?
-            #   2. lane_states_batch: hidden states of lanes (lane encoding c_j)
-            #   3. lane_states_batch_attention: the predicted score of the j-th lane segment at t - A_{i,j}
+            #   1. h_i: agent motion encoding
+            #       Why need `expand(lane_states_batch.shape), lane_states_batch, lane_states_batch_attention], dim=-1)`?
+            #       => To re-shape global_hidden_states into lane_states_batch.shape
+            #           ^ for concatenation operation `torch.cat`
+            #   2. c_j: lane_states_batch: hidden states of lanes (lane encoding)
+            #   3. A_{i,j}: lane_states_batch_attention: the predicted score of the j-th lane segment at t
+            #
             # dense_lane_scores.shape = [max_num_lanes, batch_size, t_f]
             #   t_f: future_steps / future_frame_num (default value = 12)
             dense_lane_scores = self.dense_lane_decoder(torch.cat([global_hidden_states.unsqueeze(0).expand(
@@ -163,7 +179,7 @@ class GRUDecoder(nn.Module):
             # lane-scoring head
             dense_lane_scores = F.log_softmax(dense_lane_scores, dim=0)
             print(f'(2) dense_lane_scores.shape: {dense_lane_scores.shape}')
-            return dense_lane_scores
+            return dense_lane_scores # [seq_len, batch, future_steps] = [max_len, N, H]
         def check_rules_lane_segments():
             # TODO: return list of indices of lane segments that violate 1 or many rules
             # Try this with topk lane segments first
@@ -217,15 +233,41 @@ class GRUDecoder(nn.Module):
 
     def forward(self, mapping: List[Dict], batch_size, lane_states_batch, lane_states_length, inputs: Tensor,
                 inputs_lengths: List[int], hidden_states: Tensor, device) -> Tuple[torch.Tensor, torch.Tensor]:
-        """
-        :param global_embed: hidden states of agents after encoding by global graph (shape [batch_size, hidden_size])
-        :param local_embed: hidden states of agents before encoding by global graph (shape [batch_size, hidden_size])
-        :param lane_states_batch: hidden states of lanes (shape [batch_size, max_num_lanes, hidden_size])
+        """lane-aware estimation + multimodal conditional decoder
+        Args:
+            lane_states_batch: hidden states of lanes
+                [batch_size, max_num_lanes, hidden_size]
+                ^ c_j
+                This is not encoded by global graph
+
+            inputs: hidden states of agents before encoding by global graph
+                [batch_size, sequence_length, hidden_size]
+                ^ h_i (BEFORE global graph)
+                This actually also contains the hidden states of lanes - encoder code:
+                    `element_states_batch.append(torch.cat([agent_states_batch[i], lane_states_batch[i]], dim=0))`
+                    ^ Explained in section 3.2:
+                        Afterward, the GIG further explores self-attention and skip-connection to learn the interactions among agents.
+                        Namely, h_i = ConCat[h_i, c_j] for j ∈ {1, ..., N_lane}
+
+            hidden_states: hidden states of agents after encoding by global graph
+                [
+                ^ h_i (AFTER global graph)
+
+        Other variables:
+            local_embed: hidden states of agents before encoding by global graph
+                [batch_size, hidden_size]
+                code: `local_embed = inputs[:, 0, :]`
+                This slicing operation extracts the first element (along the sequence length dimension)
+                from the inputs tensor for each batch, resulting in a tensor local_embed with the shape [batch_size, hidden_size].
+                Essentially, it selects the first hidden state from the inputs tensor for each batch.
+            global_embed: hidden states of agents after encoding by global graph
+                [batch_size, hidden_size]
         """
         labels = utils.get_from_mapping(mapping, 'labels')
         labels_is_valid = utils.get_from_mapping(mapping, 'labels_is_valid')
         loss = torch.zeros(batch_size, device=device)
         DE = np.zeros([batch_size, self.future_steps])
+        # TODO: why the decoder only cares about the embedding of the 1st sequence in inputs & hidden_states?
         local_embed = inputs[:, 0, :]  # [batch_size, hidden_size]
         global_embed = hidden_states[:, 0, :] # [batch_size, hidden_size]
         if "step_lane_score" in self.args.other_params:

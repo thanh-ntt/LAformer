@@ -29,10 +29,17 @@ class ModelMain(nn.Module):
         utils.batch_origin_init(mapping)
 
         # Encoder
+        # self.encoder.forward (section 3.2)
+        #   ...
+        #   all_element_states_batch: h_i = Concat[h_i, c_j]
         all_element_states_batch, lane_states_batch = self.encoder.forward(mapping, vector_matrix, polyline_spans, device, batch_size)
         # Global interacting graph
         inputs, inputs_lengths = utils.merge_tensors(all_element_states_batch, device=device)
+        print(f'[main] len(lane_states_batch): {len(lane_states_batch)}')
+        print(f'[main] lane_states_batch[0].shape: {lane_states_batch[0].shape}')
+        print(f'[main] lane_states_batch[1].shape: {lane_states_batch[1].shape}')
         lane_states_batch, lane_states_length = utils.merge_tensors(lane_states_batch, device=device)
+        print(f'[main] lane_states_batch.shape: {lane_states_batch.shape}')
         max_poly_num = max(inputs_lengths)
         attention_mask = torch.zeros([batch_size, max_poly_num, max_poly_num], device=device)
         for i, length in enumerate(inputs_lengths):
