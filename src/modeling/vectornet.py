@@ -146,7 +146,7 @@ class VectorNet(nn.Module):
         all_agent_states_unspilited, _ = self.point_level_sub_graph(all_agent_lists, lengths)
         all_lane_states_unspilited, _ = self.point_level_sub_graph_lane(all_lane_lists, lengths_lane)
         # Run laneGCN, get element states and lane_states
-        agent_states_batch, lane_states_batch = [], []
+        agent_states_batch, lane_states_batch = [], [] # len(agent_states_batch) = len(lane_states_batch) = batch
         for i in range(batch_size):
             map_start_polyline_idx = mapping[i]['map_start_polyline_idx']
             agents = all_agent_states_unspilited[batch_split_agent[i][0]:batch_split_agent[i][1]]
@@ -155,8 +155,10 @@ class VectorNet(nn.Module):
             lane_states_batch.append(lanes)
         print(f'[encoder] len(agent_states_batch): {len(agent_states_batch)}')
         print(f'[encoder] agent_states_batch[0].shape: {agent_states_batch[0].shape}')
+        print(f'[encoder] agent_states_batch[1].shape: {agent_states_batch[1].shape}')
         print(f'[encoder] len(lane_states_batch): {len(lane_states_batch)}')
         print(f'[encoder] lane_states_batch[0].shape: {lane_states_batch[0].shape}')
+        print(f'[encoder] lane_states_batch[1].shape: {lane_states_batch[1].shape}')
         agent_states_batch, lengths = utils.merge_tensors(agent_states_batch, device, args.hidden_size)
         lane_states_batch, lengths_lane = utils.merge_tensors_lane(lane_states_batch, device, args.hidden_size)
         src_attention_mask_lane = torch.zeros([batch_size, lane_states_batch.shape[1]], device=device)
