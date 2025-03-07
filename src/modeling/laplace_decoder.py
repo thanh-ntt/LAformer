@@ -106,7 +106,7 @@ class GRUDecoder(nn.Module):
                 #     p.requires_grad = False
             self.trajectory_refinement = trajectory_refinement(args)
 
-    def dense_lane_aware(self, i, mapping, lane_states_batch, lane_states_length, element_hidden_states, \
+    def dense_lane_aware(self, i, mapping: List[Dict], lane_states_batch, lane_states_length, element_hidden_states, \
                             element_hidden_states_lengths, global_hidden_states, device, loss):
         """future_frame_num lane aware
         Args:
@@ -195,6 +195,8 @@ class GRUDecoder(nn.Module):
             pass
         max_vector_num = lane_states_batch.shape[1]
         batch_size = len(mapping)
+        print(f'batch_size: {batch_size}')
+        print(f'mapping[0].keys(): {mapping[0].keys()}')
         src_attention_mask_lane = torch.zeros([batch_size, lane_states_batch.shape[1]], device=device) # [N, max_len]
         for i in range(batch_size):
             assert lane_states_length[i] > 0
@@ -207,11 +209,12 @@ class GRUDecoder(nn.Module):
         dense_lane_pred = dense_lane_pred.permute(1, 0, 2) # [N, max_len, H]
         print(f'(2) dense_lane_pred.shape: {dense_lane_pred.shape}')
         lane_states_batch = lane_states_batch.permute(1, 0, 2) # [N, max_len, feature]
-        future_frame_num  = self.future_frame_num
         dense_lane_pred =  dense_lane_pred.permute(0, 2, 1) # [N, H, max_len]
         print(f'(3) dense_lane_pred.shape: {dense_lane_pred.shape}')
         dense_lane_pred = dense_lane_pred.contiguous().view(-1, max_vector_num)  # [N*H, max_len]
         print(f'(4) dense_lane_pred.shape: {dense_lane_pred.shape}')
+
+        future_frame_num = self.future_frame_num  # H
 
         if self.args.do_train:
             # compute L_lane loss (cross-entropy)
@@ -229,17 +232,19 @@ class GRUDecoder(nn.Module):
         dense_lane_topk_scores = torch.zeros((dense_lane_pred.shape[0], mink), device=device)   # [N*H, mink]
         print(f'dense_lane_topk_scores.shape: {dense_lane_topk_scores.shape}')
         # dense_lane_pred = dense_lane_pred.exp()
-        for i in range(dense_lane_topk_scores.shape[0]):
+        for i in range(dense_lane_topk_scores.shape[0]): # for each i in N*H (batch_size * future_frame_num)
             idxs_lane = i // future_frame_num
             k = min(mink, lane_states_length[idxs_lane])
             _, idxs_topk = torch.topk(dense_lane_pred[i], k) # select top k=2 (or 4) lane segments to guide decoder
-            dense_lane_topk[i][:k] = lane_states_batch[idxs_lane, idxs_topk] # [N*future_frame_num, mink, hidden_size]
-            dense_lane_topk_scores[i][:k] = dense_lane_pred[i][idxs_topk] # [N*future_frame_num, mink]
-        dense_lane_topk = torch.cat([dense_lane_topk, dense_lane_topk_scores.unsqueeze(-1)], dim=-1) # [N*future_frame_num, mink, hidden_size + 1]
+            dense_lane_topk[i][:k] = lane_states_batch[idxs_lane, idxs_topk] # [N*H, mink, hidden_size]
+            dense_lane_topk_scores[i][:k] = dense_lane_pred[i][idxs_topk] # [N*H, mink]
+
+        # obtain candidate lane encodings C = ConCat{c_{1:k}, s^_{1:k}}^{t_f}_{t=1}
+        dense_lane_topk = torch.cat([dense_lane_topk, dense_lane_topk_scores.unsqueeze(-1)], dim=-1) # [N*H, mink, hidden_size + 1]
         print(f'(2) dense_lane_topk.shape: {dense_lane_topk.shape}')
         dense_lane_topk = dense_lane_topk.view(batch_size, future_frame_num*mink, self.hidden_size + 1) # [N, sense*mink, hidden_size + 1]
         print(f'(3) dense_lane_topk.shape: {dense_lane_topk.shape}')
-        return dense_lane_topk # [N, future_frame_num*mink, hidden_size + 1]
+        return dense_lane_topk # [N, H*mink, hidden_size + 1]
 
     def forward(self, mapping: List[Dict], batch_size, lane_states_batch, lane_states_length, inputs: Tensor,
                 inputs_lengths: List[int], hidden_states: Tensor, device) -> Tuple[torch.Tensor, torch.Tensor]:
@@ -297,7 +302,8 @@ class GRUDecoder(nn.Module):
             dense_lane_topk = self.proj_topk(dense_lane_topk) # [dense*mink, N, hidden_size]
             # h_{i,att}: global_embed_att = cross_attention(Q: h_i, K,V: C)
             # Q: global_embed = the target agent’s past trajectory encoding h_i
-            # K, V: dense_lane_topk = candidate lane encodings C = ConCat{c_{1:k}, s^_{1:k}}^{t_f}_{t=1}
+            # K, V: dense_lane_topk = candidate lane encodings = C
+            #   ^ (C = ConCat{c_{1:k}, s^_{1:k}}^{t_f}_{t=1}) obtained in self.dense_lane_aware
             global_embed_att = global_embed + self.aggregation_cross_att(global_embed.unsqueeze(0), dense_lane_topk).squeeze(0) # [N, D]
             global_embed = torch.cat([global_embed, global_embed_att], dim=-1) # [N, 2*D]
         local_embed = local_embed.repeat(self.num_modes, 1, 1)  # [F, N, D]

@@ -22,6 +22,11 @@ class ModelMain(nn.Module):
         self.decoder = GRUDecoder(args, self)
 
     def forward(self, mapping: List[Dict], device):
+        """main forward call, will invoke encoder (vectornet), global interaction graph, & decoder
+
+        Args:
+            mapping: a dictionary of all pre-processed input
+        """
         vector_matrix = utils.get_from_mapping(mapping, 'matrix')
         # vectors of i_th element is matrix[polyline_spans[i]]
         polyline_spans = utils.get_from_mapping(mapping, 'polyline_spans')

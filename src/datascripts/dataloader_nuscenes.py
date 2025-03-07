@@ -403,7 +403,7 @@ class NuScenesData(SingleAgentDataset):
             for i_point, point in enumerate(polygon):
                 if i_point == 0:
                     continue
-                vector = [0] * self.vector_size
+                vector = [0] * self.vector_size # seems like vector_size = 32 not used up, can add more info to vector
                 vector[-1] = polygon[i_point-1][0]
                 vector[-2] = polygon[i_point-1][1]
                 vector[-3] = point[0]
@@ -435,13 +435,14 @@ class NuScenesData(SingleAgentDataset):
                     point_pre_pre = polygon[i_point - 2]
                 vector[-17] = point_pre_pre[0]
                 vector[-18] = point_pre_pre[1]
+                # TODO: add lane heading direction to vector[-19]
                 self.vectors.append(vector)
             end = len(self.vectors)
             if start < end:
                 self.polyline_spans.append([start, end])
         if len(self.polyline_spans) == self.map_start_polyline_idx:
-            self.mapping = None
-        self.matrix = np.array(self.vectors)
+            self.mapping = None # TODO: why do we even do this?
+        self.matrix = np.array(self.vectors) # self.matrix seems like un-used variable. TODO: refactor (remove self.matrix)
         return 0
 
     def encode_agents(self, idx: int) -> int:
@@ -670,12 +671,12 @@ class NuScenesData(SingleAgentDataset):
         # leftdown, rightup
         scene_x_min = - 50
         scene_x_max = 50
-        scene_y_min = - 20
+        scene_y_min = - 20 # why -20 not -50? Care less about lane segments behind, more about lane segments in front
         scene_y_max = 80
 
-        lane_id = get_lanes_in_radius(x=self.cent_x, y=self.cent_y, radius=100,
+        lanes = get_lanes_in_radius(x=self.cent_x, y=self.cent_y, radius=100,
                                       discretization_meters=1.0, map_api=self.map)
-        if len(lane_id) == 0:
+        if len(lanes) == 0:
             self.mapping = None
         self.lanes_attrs = {
             "has_traffic_control": [],
@@ -685,29 +686,32 @@ class NuScenesData(SingleAgentDataset):
 
         lane_traj_tokens = []
         valid_lane_traj_tokens = []
-        for token, li in lane_id.items():
-            li = [np.array([coor[0], coor[1]]) for coor in li]
+        for lane_token, li in lanes.items():
+            li = [np.array([coord[0], coord[1]]) for coord in li]
             if len(li) > 1:
                 self.lanes_midlines_abs.append(li)
-                lane_traj_tokens.append(token)
+                lane_traj_tokens.append(lane_token)
         # polygons = self.get_polygons_around_agent()
         # flags = self.get_lane_flags(self.lanes_midlines_abs, polygons)
         # assert len(flags) == len(self.lanes_midlines_abs) == len(valid_lane_traj_tokens)
         self.valid_lanes_midlines_abs = []
 
-        for line_idx, li in enumerate(self.lanes_midlines_abs):
-            rel_li = np.array([rotate(point[0] - self.cent_x, point[1] - self.cent_y, self.angle) for point in li])
+        for lane_idx, li in enumerate(self.lanes_midlines_abs):
+            # rotate to get the relative (rel) coordinate from absolute (abs) coordinate
+            # This conversion is necessary as get_lanes_in_radius
+            #   return: Mapping from lane id to list of coordinate tuples in global coordinate system.
+            rel_li = np.array([rotate(coord[0] - self.cent_x, coord[1] - self.cent_y, self.angle) for coord in li])
             tmp_rel_li = []
             tmp_abs_li = []
-            for i_point, coor in enumerate(rel_li):
-                if scene_x_min <= coor[0] <= scene_x_max and scene_y_min <= coor[1] <= scene_y_max:
-                    tmp_rel_li.append(coor)
+            for i_point, coord in enumerate(rel_li):
+                if scene_x_min <= coord[0] <= scene_x_max and scene_y_min <= coord[1] <= scene_y_max:
+                    tmp_rel_li.append(coord)
                     tmp_abs_li.append(li[i_point])
             assert len(tmp_abs_li) == len(tmp_rel_li)
             if len(tmp_rel_li) > 1:
                 self.lanes_midlines_rel.append(np.array(tmp_rel_li))
                 self.valid_lanes_midlines_abs.append(np.array(tmp_abs_li))
-                valid_lane_traj_tokens.append(lane_traj_tokens[line_idx])
+                valid_lane_traj_tokens.append(lane_traj_tokens[lane_idx])
 
         polygons = self.get_polygons_around_agent()
         flags = self.get_lane_flags(self.valid_lanes_midlines_abs, polygons)
@@ -738,8 +742,8 @@ class NuScenesData(SingleAgentDataset):
                     self.lanes_attrs['is_intersection'].append(False)
 
                 # get 'turn_direction' attribute
-                token = valid_lane_traj_tokens[rel_li_idx]
-                arcline = self.map.arcline_path_3.get(token)
+                lane_token = valid_lane_traj_tokens[rel_li_idx]
+                arcline = self.map.arcline_path_3.get(lane_token)
                 traj = discretize_lane(arcline, 1.0)
                 traj = np.array([np.array((point[0], point[1]), dtype=float) for point in traj])
                 curvature = get_arc_curve(traj)
@@ -865,6 +869,15 @@ class NuScenesData(SingleAgentDataset):
     def extract_multiprocess(self):
         """
         the parallel process of extracting data
+        Parallelism: all scenes, all objects, all tokens in parallel, put into the same `ex_list` / `eval.ex_list`
+
+        each process extract data in parallel, then put results into a common queue_res
+        Call stack:
+            TrajectoryDataset.__getitem__(idx)
+            .extract_data(idx)
+
+        ^ How to get the idx? => from `data_num = len(self.token_list)` (get_prediction_challenge_split)
+
         """
         ex_list = []
 
