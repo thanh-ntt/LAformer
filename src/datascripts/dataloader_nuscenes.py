@@ -728,9 +728,6 @@ class NuScenesData(SingleAgentDataset):
             # This conversion is necessary as get_lanes_in_radius
             #   return: Mapping from lane id to list of coordinate tuples in global coordinate system.
             lane_midline_rel = np.array([rotate(coord[0] - self.cent_x, coord[1] - self.cent_y, self.angle) for coord in lane_midline_abs])
-            if lane_idx == 0:
-                print(f'lane_midline_abs: {lane_midline_abs}')
-                print(f'lane_midline_rel: {lane_midline_rel}')
             tmp_lane_midline_rel = []
             tmp_lane_midline_abs = []
             for point_idx, coord in enumerate(lane_midline_rel):
@@ -740,6 +737,8 @@ class NuScenesData(SingleAgentDataset):
             assert len(tmp_lane_midline_abs) == len(tmp_lane_midline_rel)
             if len(tmp_lane_midline_rel) > 1:
                 if print_count == 0:
+                    print(f'lane_midline_abs: {lane_midline_abs}')
+                    print(f'lane_midline_rel: {lane_midline_rel}')
                     print(f'tmp_lane_midline_abs: {tmp_lane_midline_abs}')
                     print(f'tmp_lane_midline_rel: {tmp_lane_midline_rel}')
                     print_count += 1
