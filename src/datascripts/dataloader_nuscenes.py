@@ -704,6 +704,7 @@ class NuScenesData(SingleAgentDataset):
         lane_traj_tokens = []
         valid_lane_traj_tokens = []
         i = 0
+        print_count = 0
         for lane_token, lane_poses in lanes.items():
             if i % 100 == 0:
                 print(f'(i = {i}) lane_poses[:3]: {lane_poses[:3]}')
@@ -737,10 +738,11 @@ class NuScenesData(SingleAgentDataset):
                     tmp_lane_midline_rel.append(coord)
                     tmp_lane_midline_abs.append(lane_midline_abs[point_idx])
             assert len(tmp_lane_midline_abs) == len(tmp_lane_midline_rel)
-            if lane_idx == 0:
-                print(f'tmp_lane_midline_abs: {tmp_lane_midline_abs}')
-                print(f'tmp_lane_midline_rel: {tmp_lane_midline_rel}')
             if len(tmp_lane_midline_rel) > 1:
+                if print_count == 0:
+                    print(f'tmp_lane_midline_abs: {tmp_lane_midline_abs}')
+                    print(f'tmp_lane_midline_rel: {tmp_lane_midline_rel}')
+                    print_count += 1
                 self.valid_lanes_midlines_rel.append(np.array(tmp_lane_midline_rel))
                 self.valid_lanes_midlines_abs.append(np.array(tmp_lane_midline_abs))
                 valid_lane_traj_tokens.append(lane_traj_tokens[lane_idx])
