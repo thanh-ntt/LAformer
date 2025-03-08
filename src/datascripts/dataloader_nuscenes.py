@@ -812,32 +812,35 @@ class NuScenesData(SingleAgentDataset):
         self.subdivided_lane_2_origin_lane_labels = []
         self.rel_ind_2_abs_ind_offset = []
 
+        total_lane_poses_num = 0
         for lane_idx, lane_poses in enumerate(self.valid_lanes_midlines_rel):
             if len(lane_poses) <= 1:
                 continue
             # print(lane_idx)
+            total_lane_poses_num += len(lane_poses)
             if lane_idx == 0:
                 print(f'lane_poses[:10]: {lane_poses[:10]}')
             self.divide_lane(lane_poses, lane_idx)
 
+        print(f'total_lane_poses_num: {total_lane_poses_num}')
         self.subdivided_lane_traj_rel = np.array(self.subdivided_lane_traj_rel, dtype=object)
 
         assert len(self.subdivided_lane_2_origin_lane_labels) == len(self.subdivided_lane_traj_rel)
 
-    def divide_lane(self, traj, l_id):
+    def divide_lane(self, lane_poses, l_id):
         """
         divide a lane
         Args:
-            traj: the trajectory of a lane <= this is list of lane poses
+            lane_poses: the trajectory of a lane <= this is list of lane poses
             l_id: the lane index of the origin lane
         """
         left_index = 0
-        length = len(traj)
+        length = len(lane_poses)
         bound = self.subdivide_len 
         # print(length)
         while True:
             if length - left_index >= bound:
-                self.subdivided_lane_traj_rel.append(traj[left_index:left_index+bound])
+                self.subdivided_lane_traj_rel.append(lane_poses[left_index:left_index + bound])
                 self.subdivided_lane_2_origin_lane_labels.append(l_id)
 
                 if len(self.subdivided_lane_2_origin_lane_labels) == 1 or \
@@ -848,7 +851,7 @@ class NuScenesData(SingleAgentDataset):
 
                 left_index += bound
             elif 1 < length - left_index < bound:
-                self.subdivided_lane_traj_rel.append(traj[left_index:])
+                self.subdivided_lane_traj_rel.append(lane_poses[left_index:])
                 self.subdivided_lane_2_origin_lane_labels.append(l_id)
 
                 if len(self.subdivided_lane_2_origin_lane_labels) == 1 or \
