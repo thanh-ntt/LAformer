@@ -790,7 +790,9 @@ class NuScenesData(SingleAgentDataset):
                 curvature = get_arc_curve(lane_poses)
                 if rel_li_idx % 35 == 0: # TODO: remove this if when done debugging
                     lane_poses = self.valid_lanes_midline_abs[rel_li_idx]
-                    lane_angle = - math.atan2(lane_poses[1][1] - lane_poses[0][1], lane_poses[1][0] - lane_poses[0][0]) + math.pi / 2
+                    # lane_angle = - math.atan2(lane_poses[1][1] - lane_poses[0][1], lane_poses[1][0] - lane_poses[0][0]) + math.pi / 2
+                    lane_angle = math.atan2(lane_poses[1][1] - lane_poses[0][1],
+                                              lane_poses[1][0] - lane_poses[0][0]) + math.pi / 2
                     # This lane_angle is correct (checked 3 different lanes)
                     #   ^ with offset of math.pi / 2 (taken from North, not East direction of circle)
                     print(f'valid_lane_traj_tokens[rel_li_idx]: {valid_lane_traj_tokens[rel_li_idx]}')
