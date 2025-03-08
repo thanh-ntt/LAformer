@@ -237,6 +237,7 @@ class NuScenesData(SingleAgentDataset):
         self.lanes_midline_abs: List[List[Tuple[float, float, float]]] = []
         self.valid_lanes_midline_abs = []
         self.valid_lanes_midline_rel = []
+        self.valid_lane_traj_tokens = []
         self.polygons = []
         self.stepwise_label = np.zeros((self.eval_frames))
         self.vectors = []
@@ -710,7 +711,6 @@ class NuScenesData(SingleAgentDataset):
         # list of token with index corresponding to self.lanes_midlines_abs's index
         # lane_traj_tokens[0] = token of lane retrieved from self.lanes_midlines_abs[0]
         lane_traj_tokens = []
-        valid_lane_traj_tokens = []
         i = 0
         print_count = 0
         for lane_token, lane_poses in lanes.items():
@@ -753,11 +753,11 @@ class NuScenesData(SingleAgentDataset):
                 # print_count += 1
                 self.valid_lanes_midline_rel.append(np.array(tmp_lane_midline_rel))
                 self.valid_lanes_midline_abs.append(np.array(tmp_lane_midline_abs))
-                valid_lane_traj_tokens.append(lane_traj_tokens[lane_idx])
+                self.valid_lane_traj_tokens.append(lane_traj_tokens[lane_idx])
 
         polygons = self.get_polygons_around_agent()
         flags = self.get_lane_flags(self.valid_lanes_midline_abs, polygons)
-        assert len(flags) == len(self.valid_lanes_midline_abs) == len(valid_lane_traj_tokens) == len(self.valid_lanes_midline_rel)
+        assert len(flags) == len(self.valid_lanes_midline_abs) == len(self.valid_lane_traj_tokens) == len(self.valid_lanes_midline_rel)
 
         for i_flag, flag in enumerate(flags):
             assert len(flag) == len(self.valid_lanes_midline_rel[i_flag])
@@ -784,7 +784,7 @@ class NuScenesData(SingleAgentDataset):
                     self.lanes_attrs['is_intersection'].append(False)
 
                 # get 'turn_direction' attribute
-                lane_token = valid_lane_traj_tokens[rel_li_idx]
+                lane_token = self.valid_lane_traj_tokens[rel_li_idx]
                 arcline = self.map.arcline_path_3.get(lane_token)
                 lane_poses = discretize_lane(arcline, 1.0)
                 lane_poses = np.array([np.array((point[0], point[1]), dtype=float) for point in lane_poses])
@@ -836,7 +836,8 @@ class NuScenesData(SingleAgentDataset):
             # print(lane_idx)
             total_lane_poses_num += len(lane_poses)
             if lane_idx == 0:
-                print(f'lane_poses[:10]: {lane_poses[:10]}')
+                print(f'lane_idx = {lane_idx}, lane_poses[:10]: {lane_poses[:10]}')
+                print(f'self.valid_lane_traj_tokens[lane_idx]: {self.valid_lane_traj_tokens[lane_idx]}')
             self.divide_lane(lane_poses, lane_idx)
 
         print(f'total_lane_poses_num: {total_lane_poses_num}')
