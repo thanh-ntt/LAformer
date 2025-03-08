@@ -737,6 +737,9 @@ class NuScenesData(SingleAgentDataset):
                     tmp_lane_midline_rel.append(coord)
                     tmp_lane_midline_abs.append(lane_midline_abs[point_idx])
             assert len(tmp_lane_midline_abs) == len(tmp_lane_midline_rel)
+            if lane_idx == 0:
+                print(f'tmp_lane_midline_abs: {tmp_lane_midline_abs}')
+                print(f'tmp_lane_midline_rel: {tmp_lane_midline_rel}')
             if len(tmp_lane_midline_rel) > 1:
                 self.valid_lanes_midlines_rel.append(np.array(tmp_lane_midline_rel))
                 self.valid_lanes_midlines_abs.append(np.array(tmp_lane_midline_abs))
