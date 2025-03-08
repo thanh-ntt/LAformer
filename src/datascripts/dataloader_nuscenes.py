@@ -407,6 +407,7 @@ class NuScenesData(SingleAgentDataset):
         # encode subdivided polygons
 
         print(f'len(self.subdivided_lane_traj_rel): {len(self.subdivided_lane_traj_rel)}')
+        pprint(self.subdivided_lane_traj_rel[0])
         for i_polygon, polygon in enumerate(self.subdivided_lane_traj_rel):
             start = len(self.vectors)
             for i_point, point in enumerate(polygon):
@@ -701,7 +702,7 @@ class NuScenesData(SingleAgentDataset):
         i = 0
         for lane_token, li in lanes.items():
             if i % 100 == 0:
-                print(f'li: {li}')
+                print(f'(i = {i}) li: {li[:2]}')
             i += 1
             li = [np.array([coord[0], coord[1]]) for coord in li]
             if len(li) > 1:
@@ -821,6 +822,7 @@ class NuScenesData(SingleAgentDataset):
         """
         left_index = 0
         length = len(traj)
+        print(f'traj[:10]: {traj[:10]}')
         bound = self.subdivide_len 
         # print(length)
         while True:
