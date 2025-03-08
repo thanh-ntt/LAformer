@@ -700,21 +700,20 @@ class NuScenesData(SingleAgentDataset):
         lane_traj_tokens = []
         valid_lane_traj_tokens = []
         i = 0
-        for lane_token, li in lanes.items():
+        for lane_token, lane_poses in lanes.items():
             if i % 100 == 0:
-                print(f'(i = {i}) li: {li[:2]}')
+                print(f'(i = {i}) li: {lane_poses[:3]}')
             i += 1
             # TODO: add this back if error
             # li = [np.array([coord[0], coord[1]]) for coord in li]
-            if len(li) > 1:
-                self.lanes_midlines_abs.append(li)
+            if len(lane_poses) > 1:
+                self.lanes_midlines_abs.append(lane_poses)
                 lane_traj_tokens.append(lane_token)
         # polygons = self.get_polygons_around_agent()
         # flags = self.get_lane_flags(self.lanes_midlines_abs, polygons)
         # assert len(flags) == len(self.lanes_midlines_abs) == len(valid_lane_traj_tokens)
         self.valid_lanes_midlines_abs = []
 
-        i = 0
         print(f'len(self.lanes_midlines_abs): {len(self.lanes_midlines_abs)}')
         print(f'self.lanes_midlines_abs[0]: {self.lanes_midlines_abs[0]}')
         print(f'self.angle: {self.angle}')
@@ -723,10 +722,9 @@ class NuScenesData(SingleAgentDataset):
             # This conversion is necessary as get_lanes_in_radius
             #   return: Mapping from lane id to list of coordinate tuples in global coordinate system.
             rel_li = np.array([rotate(coord[0] - self.cent_x, coord[1] - self.cent_y, self.angle) for coord in li])
-            if i < 10:
-                print(f'li: {li[0]}')
-                print(f'rel_li: {rel_li[0]}')
-            i += 1
+            if lane_idx < 10:
+                print(f'li: {li}')
+                print(f'rel_li: {rel_li}')
             tmp_rel_li = []
             tmp_abs_li = []
             for i_point, coord in enumerate(rel_li):
