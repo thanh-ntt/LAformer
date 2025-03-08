@@ -723,8 +723,8 @@ class NuScenesData(SingleAgentDataset):
         # assert len(flags) == len(self.lanes_midlines_abs) == len(valid_lane_traj_tokens)
         self.valid_lanes_midline_abs = []
 
-        print(f'len(self.lanes_midlines_abs): {len(self.lanes_midline_abs)}')
-        print(f'self.lanes_midlines_abs[0]: {self.lanes_midline_abs[0]}')
+        # print(f'len(self.lanes_midlines_abs): {len(self.lanes_midline_abs)}')
+        # print(f'self.lanes_midlines_abs[0]: {self.lanes_midline_abs[0]}')
         print(f'self.angle: {self.angle}')
         # self.lanes_midlines_abs:
         for lane_idx, lane_midline_abs in enumerate(self.lanes_midline_abs):
@@ -744,8 +744,8 @@ class NuScenesData(SingleAgentDataset):
             assert len(tmp_lane_midline_abs) == len(tmp_lane_midline_rel)
             if len(tmp_lane_midline_rel) > 1:
                 if print_count % 10 == 0:
-                    print(f'lane_midline_abs: {lane_midline_abs}')
-                    print(f'lane_midline_rel: {lane_midline_rel}')
+                    # print(f'lane_midline_abs: {lane_midline_abs}')
+                    # print(f'lane_midline_rel: {lane_midline_rel}')
                     print(f'tmp_lane_midline_abs: {tmp_lane_midline_abs}')
                     print(f'tmp_lane_midline_rel: {tmp_lane_midline_rel}')
                     print(f'lane_traj_tokens[lane_idx]: {lane_traj_tokens[lane_idx]}')
