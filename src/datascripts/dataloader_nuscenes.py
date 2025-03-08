@@ -233,7 +233,7 @@ class NuScenesData(SingleAgentDataset):
         #   mid-point: a single lane pose of Tuple[float, float, float] = (x, y, yaw)
         #       all nearby lanes are retrieved by get_lanes_in_radius
         #       then, each lane is discretized into multiple lane poses
-        self.lanes_midlines_abs: List[List[Tuple[float, float, float]]] = []
+        self.lanes_midline_abs: List[List[Tuple[float, float, float]]] = []
         self.valid_lanes_midlines_abs = []
         self.valid_lanes_midlines_rel = []
         self.polygons = []
@@ -711,35 +711,35 @@ class NuScenesData(SingleAgentDataset):
             # TODO: add this back if error
             # li = [np.array([coord[0], coord[1]]) for coord in li]
             if len(lane_poses) > 1:
-                self.lanes_midlines_abs.append(lane_poses)
+                self.lanes_midline_abs.append(lane_poses)
                 lane_traj_tokens.append(lane_token)
         # polygons = self.get_polygons_around_agent()
         # flags = self.get_lane_flags(self.lanes_midlines_abs, polygons)
         # assert len(flags) == len(self.lanes_midlines_abs) == len(valid_lane_traj_tokens)
         self.valid_lanes_midlines_abs = []
 
-        print(f'len(self.lanes_midlines_abs): {len(self.lanes_midlines_abs)}')
-        print(f'self.lanes_midlines_abs[0]: {self.lanes_midlines_abs[0]}')
+        print(f'len(self.lanes_midlines_abs): {len(self.lanes_midline_abs)}')
+        print(f'self.lanes_midlines_abs[0]: {self.lanes_midline_abs[0]}')
         print(f'self.angle: {self.angle}')
         # self.lanes_midlines_abs:
-        for lane_idx, li in enumerate(self.lanes_midlines_abs):
+        for lane_idx, lane_midline_abs in enumerate(self.lanes_midline_abs):
             # rotate to get the relative (rel) coordinate from absolute (abs) coordinate
             # This conversion is necessary as get_lanes_in_radius
             #   return: Mapping from lane id to list of coordinate tuples in global coordinate system.
-            rel_li = np.array([rotate(coord[0] - self.cent_x, coord[1] - self.cent_y, self.angle) for coord in li])
+            lane_midline_rel = np.array([rotate(coord[0] - self.cent_x, coord[1] - self.cent_y, self.angle) for coord in lane_midline_abs])
             if lane_idx == 0:
-                print(f'li: {li}')
-                print(f'rel_li: {rel_li}')
-            tmp_rel_li = []
-            tmp_abs_li = []
-            for i_point, coord in enumerate(rel_li):
+                print(f'lane_midline_abs: {lane_midline_abs}')
+                print(f'lane_midline_rel: {lane_midline_rel}')
+            tmp_lane_midline_rel = []
+            tmp_lane_midline_abs = []
+            for point_idx, coord in enumerate(lane_midline_rel):
                 if scene_x_min <= coord[0] <= scene_x_max and scene_y_min <= coord[1] <= scene_y_max:
-                    tmp_rel_li.append(coord)
-                    tmp_abs_li.append(li[i_point])
-            assert len(tmp_abs_li) == len(tmp_rel_li)
-            if len(tmp_rel_li) > 1:
-                self.valid_lanes_midlines_rel.append(np.array(tmp_rel_li))
-                self.valid_lanes_midlines_abs.append(np.array(tmp_abs_li))
+                    tmp_lane_midline_rel.append(coord)
+                    tmp_lane_midline_abs.append(lane_midline_abs[point_idx])
+            assert len(tmp_lane_midline_abs) == len(tmp_lane_midline_rel)
+            if len(tmp_lane_midline_rel) > 1:
+                self.valid_lanes_midlines_rel.append(np.array(tmp_lane_midline_rel))
+                self.valid_lanes_midlines_abs.append(np.array(tmp_lane_midline_abs))
                 valid_lane_traj_tokens.append(lane_traj_tokens[lane_idx])
 
         polygons = self.get_polygons_around_agent()
@@ -808,13 +808,13 @@ class NuScenesData(SingleAgentDataset):
         self.subdivided_lane_2_origin_lane_labels = []
         self.rel_ind_2_abs_ind_offset = []
 
-        for lane_idx, lane_traj in enumerate(self.valid_lanes_midlines_rel):
-            if len(lane_traj) <= 1:
+        for lane_idx, lane_poses in enumerate(self.valid_lanes_midlines_rel):
+            if len(lane_poses) <= 1:
                 continue
             # print(lane_idx)
             if lane_idx == 0:
-                print(f'lane_traj[:10]: {lane_traj[:10]}')
-            self.divide_lane(lane_traj, lane_idx)
+                print(f'lane_poses[:10]: {lane_poses[:10]}')
+            self.divide_lane(lane_poses, lane_idx)
 
         self.subdivided_lane_traj_rel = np.array(self.subdivided_lane_traj_rel, dtype=object)
 
