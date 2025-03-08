@@ -1,6 +1,7 @@
 # LAfromer: https://arxiv.org/pdf/2302.13933.pdf
 # Written by Mengmeng Liu 
 # All Rights Reserved
+from pprint import pprint
 from typing import Tuple
 import torch
 import torch.nn as nn
@@ -196,7 +197,8 @@ class GRUDecoder(nn.Module):
         max_vector_num = lane_states_batch.shape[1]
         batch_size = len(mapping)
         print(f'batch_size: {batch_size}')
-        print(f'mapping[0].keys(): {mapping[0].keys()}')
+        print('mapping[0].keys():')
+        pprint(mapping[0].keys())
         src_attention_mask_lane = torch.zeros([batch_size, lane_states_batch.shape[1]], device=device) # [N, max_len]
         for i in range(batch_size):
             assert lane_states_length[i] > 0

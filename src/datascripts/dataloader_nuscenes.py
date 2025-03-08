@@ -226,6 +226,10 @@ class NuScenesData(SingleAgentDataset):
         """
         self.agents_past_traj_abs = []
         self.agents_past_traj_rel = []
+
+        # lanes_midlines_abs: list of (x,y) coordinates of nearby lanes (lane poses)
+        #   all nearby lanes are retrieved by get_lanes_in_radius
+        #   then, each lane is discretized into multiple lane poses
         self.lanes_midlines_abs = []
         self.valid_lanes_midlines_abs = []
         self.lanes_midlines_rel = []
@@ -674,9 +678,12 @@ class NuScenesData(SingleAgentDataset):
         scene_y_min = - 20 # why -20 not -50? Care less about lane segments behind, more about lane segments in front
         scene_y_max = 80
 
+        # get all lane poses from nearby lanes, discretized by 1.0m
         lanes = get_lanes_in_radius(x=self.cent_x, y=self.cent_y, radius=100,
                                       discretization_meters=1.0, map_api=self.map)
+        print(f'len(lanes): {len(lanes)}')
         if len(lanes) == 0:
+            print(f'reset self.mapping, cur self.mapping: {self.mapping}')
             self.mapping = None
         self.lanes_attrs = {
             "has_traffic_control": [],
@@ -686,7 +693,11 @@ class NuScenesData(SingleAgentDataset):
 
         lane_traj_tokens = []
         valid_lane_traj_tokens = []
+        i = 0
         for lane_token, li in lanes.items():
+            if i % 100 == 0:
+                print(f'li: {li[0]}')
+            i += 1
             li = [np.array([coord[0], coord[1]]) for coord in li]
             if len(li) > 1:
                 self.lanes_midlines_abs.append(li)
@@ -696,11 +707,17 @@ class NuScenesData(SingleAgentDataset):
         # assert len(flags) == len(self.lanes_midlines_abs) == len(valid_lane_traj_tokens)
         self.valid_lanes_midlines_abs = []
 
+        i = 0
+        print(f'len(self.lanes_midlines_abs): {len(self.lanes_midlines_abs)}')
+        print(f'self.angle: {self.angle}')
         for lane_idx, li in enumerate(self.lanes_midlines_abs):
             # rotate to get the relative (rel) coordinate from absolute (abs) coordinate
             # This conversion is necessary as get_lanes_in_radius
             #   return: Mapping from lane id to list of coordinate tuples in global coordinate system.
             rel_li = np.array([rotate(coord[0] - self.cent_x, coord[1] - self.cent_y, self.angle) for coord in li])
+            if i % 100 == 0:
+                print(f'rel_li (after rotation): {rel_li[0]}')
+            i += 1
             tmp_rel_li = []
             tmp_abs_li = []
             for i_point, coord in enumerate(rel_li):
@@ -744,9 +761,9 @@ class NuScenesData(SingleAgentDataset):
                 # get 'turn_direction' attribute
                 lane_token = valid_lane_traj_tokens[rel_li_idx]
                 arcline = self.map.arcline_path_3.get(lane_token)
-                traj = discretize_lane(arcline, 1.0)
-                traj = np.array([np.array((point[0], point[1]), dtype=float) for point in traj])
-                curvature = get_arc_curve(traj)
+                lane_poses = discretize_lane(arcline, 1.0)
+                lane_poses = np.array([np.array((point[0], point[1]), dtype=float) for point in lane_poses])
+                curvature = get_arc_curve(lane_poses)
                 if curvature < 100:
                     li = self.valid_lanes_midlines_abs[rel_li_idx]
                     lane_angle = - math.atan2(li[1][1] - li[0][1], li[1][0] - li[0][0]) + math.pi / 2
@@ -773,16 +790,17 @@ class NuScenesData(SingleAgentDataset):
         """
         subdivide all the lanes acquired by function "get_lane_midlines"
         """
+        # TODO: why need to subdivide again after calling get_lanes_in_radius (internally invoke discretize_lane)?
         # self.subdivided_lane_traj_abs = []
         self.subdivided_lane_traj_rel = []
         self.subdivided_lane_2_origin_lane_labels = []
         self.rel_ind_2_abs_ind_offset = []
 
-        for lane_id, lane_traj in enumerate(self.lanes_midlines_rel):
+        for lane_idx, lane_traj in enumerate(self.lanes_midlines_rel):
             if len(lane_traj) <= 1:
                 continue
-            # print(lane_id)
-            self.divide_lane(lane_traj, lane_id)
+            # print(lane_idx)
+            self.divide_lane(lane_traj, lane_idx)
 
         self.subdivided_lane_traj_rel = np.array(self.subdivided_lane_traj_rel, dtype=object)
 
@@ -792,7 +810,7 @@ class NuScenesData(SingleAgentDataset):
         """
         divide a lane
         Args:
-            traj: the trajectory of a lane
+            traj: the trajectory of a lane <= this is list of lane poses
             l_id: the lane index of the origin lane
         """
         left_index = 0
