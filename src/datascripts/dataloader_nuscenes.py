@@ -228,12 +228,14 @@ class NuScenesData(SingleAgentDataset):
         self.agents_past_traj_abs = []
         self.agents_past_traj_rel = []
 
-        # lanes_midlines_abs: list of (x,y) coordinates of nearby lanes (lane poses)
-        #   all nearby lanes are retrieved by get_lanes_in_radius
-        #   then, each lane is discretized into multiple lane poses
-        self.lanes_midlines_abs = []
+        # lanes_midlines_abs: list of lanes (each nearby lane = a single List[Tuple[float, float, float]])
+        #   lanes: list of midline / mid-points of a single lane
+        #   mid-point: a single lane pose of Tuple[float, float, float] = (x, y, yaw)
+        #       all nearby lanes are retrieved by get_lanes_in_radius
+        #       then, each lane is discretized into multiple lane poses
+        self.lanes_midlines_abs: List[List[Tuple[float, float, float]]] = []
         self.valid_lanes_midlines_abs = []
-        self.lanes_midlines_rel = []
+        self.valid_lanes_midlines_rel = []
         self.polygons = []
         self.stepwise_label = np.zeros((self.eval_frames))
         self.vectors = []
@@ -684,7 +686,7 @@ class NuScenesData(SingleAgentDataset):
         scene_y_min = - 20 # why -20 not -50? Care less about lane segments behind, more about lane segments in front
         scene_y_max = 80
 
-        # get all lane poses from nearby lanes, discretized by 1.0m
+        # get all lane (each with lane poses, discretized by 1.0m) from nearby lanes
         lanes = get_lanes_in_radius(x=self.cent_x, y=self.cent_y, radius=100,
                                       discretization_meters=1.0, map_api=self.map)
         print(f'len(lanes): {len(lanes)}')
@@ -697,12 +699,14 @@ class NuScenesData(SingleAgentDataset):
             "is_intersection": []
         }
 
+        # list of token with index corresponding to self.lanes_midlines_abs's index
+        # lane_traj_tokens[0] = token of lane retrieved from self.lanes_midlines_abs[0]
         lane_traj_tokens = []
         valid_lane_traj_tokens = []
         i = 0
         for lane_token, lane_poses in lanes.items():
             if i % 100 == 0:
-                print(f'(i = {i}) li: {lane_poses[:3]}')
+                print(f'(i = {i}) lane_poses[:3]: {lane_poses[:3]}')
             i += 1
             # TODO: add this back if error
             # li = [np.array([coord[0], coord[1]]) for coord in li]
@@ -717,6 +721,7 @@ class NuScenesData(SingleAgentDataset):
         print(f'len(self.lanes_midlines_abs): {len(self.lanes_midlines_abs)}')
         print(f'self.lanes_midlines_abs[0]: {self.lanes_midlines_abs[0]}')
         print(f'self.angle: {self.angle}')
+        # self.lanes_midlines_abs:
         for lane_idx, li in enumerate(self.lanes_midlines_abs):
             # rotate to get the relative (rel) coordinate from absolute (abs) coordinate
             # This conversion is necessary as get_lanes_in_radius
@@ -733,18 +738,18 @@ class NuScenesData(SingleAgentDataset):
                     tmp_abs_li.append(li[i_point])
             assert len(tmp_abs_li) == len(tmp_rel_li)
             if len(tmp_rel_li) > 1:
-                self.lanes_midlines_rel.append(np.array(tmp_rel_li))
+                self.valid_lanes_midlines_rel.append(np.array(tmp_rel_li))
                 self.valid_lanes_midlines_abs.append(np.array(tmp_abs_li))
                 valid_lane_traj_tokens.append(lane_traj_tokens[lane_idx])
 
         polygons = self.get_polygons_around_agent()
         flags = self.get_lane_flags(self.valid_lanes_midlines_abs, polygons)
-        assert len(flags) == len(self.valid_lanes_midlines_abs) == len(valid_lane_traj_tokens) == len(self.lanes_midlines_rel)
+        assert len(flags) == len(self.valid_lanes_midlines_abs) == len(valid_lane_traj_tokens) == len(self.valid_lanes_midlines_rel)
 
         for i_flag, flag in enumerate(flags):
-            assert len(flag) == len(self.lanes_midlines_rel[i_flag])
+            assert len(flag) == len(self.valid_lanes_midlines_rel[i_flag])
 
-        for rel_li_idx, rel_li in enumerate(self.lanes_midlines_rel):
+        for rel_li_idx, rel_li in enumerate(self.valid_lanes_midlines_rel):
             if len(rel_li) > 1:
                 # assert len(rel_li) == len(self.valid_lanes_midlines_abs[rel_li_idx])
 
@@ -803,7 +808,7 @@ class NuScenesData(SingleAgentDataset):
         self.subdivided_lane_2_origin_lane_labels = []
         self.rel_ind_2_abs_ind_offset = []
 
-        for lane_idx, lane_traj in enumerate(self.lanes_midlines_rel):
+        for lane_idx, lane_traj in enumerate(self.valid_lanes_midlines_rel):
             if len(lane_traj) <= 1:
                 continue
             # print(lane_idx)
