@@ -812,6 +812,8 @@ class NuScenesData(SingleAgentDataset):
             if len(lane_traj) <= 1:
                 continue
             # print(lane_idx)
+            if lane_idx == 0:
+                print(f'lane_traj[:10]: {lane_traj[:10]}')
             self.divide_lane(lane_traj, lane_idx)
 
         self.subdivided_lane_traj_rel = np.array(self.subdivided_lane_traj_rel, dtype=object)
@@ -827,7 +829,6 @@ class NuScenesData(SingleAgentDataset):
         """
         left_index = 0
         length = len(traj)
-        print(f'traj[:10]: {traj[:10]}')
         bound = self.subdivide_len 
         # print(length)
         while True:
