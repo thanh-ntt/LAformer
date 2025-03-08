@@ -723,9 +723,9 @@ class NuScenesData(SingleAgentDataset):
             # This conversion is necessary as get_lanes_in_radius
             #   return: Mapping from lane id to list of coordinate tuples in global coordinate system.
             rel_li = np.array([rotate(coord[0] - self.cent_x, coord[1] - self.cent_y, self.angle) for coord in li])
-            if i % 10 == 0:
-                print(f'li (before rotation): {li[0]}')
-                print(f'rel_li (after rotation): {rel_li[0]}')
+            if i < 10:
+                print(f'li: {li[0]}')
+                print(f'rel_li: {rel_li[0]}')
             i += 1
             tmp_rel_li = []
             tmp_abs_li = []
