@@ -786,11 +786,13 @@ class NuScenesData(SingleAgentDataset):
                 lane_poses = discretize_lane(arcline, 1.0)
                 lane_poses = np.array([np.array((point[0], point[1]), dtype=float) for point in lane_poses])
                 curvature = get_arc_curve(lane_poses)
+                if rel_li_idx == 0: # TODO: remove this if when done debugging
+                    lane_poses = self.valid_lanes_midline_abs[rel_li_idx]
+                    lane_angle = - math.atan2(lane_poses[1][1] - lane_poses[0][1], lane_poses[1][0] - lane_poses[0][0]) + math.pi / 2
+                    print(f'lane_angle: {lane_angle}')
                 if curvature < 100:
                     li = self.valid_lanes_midline_abs[rel_li_idx]
                     lane_angle = - math.atan2(li[1][1] - li[0][1], li[1][0] - li[0][0]) + math.pi / 2
-                    if rel_li_idx == 0:
-                        print(f'lane_angle: {lane_angle}')
                     origin_point = li[0]
                     end_point = li[-1]
                     end_point = np.array(rotate(end_point[0] - origin_point[0], end_point[1] - origin_point[1], lane_angle))
