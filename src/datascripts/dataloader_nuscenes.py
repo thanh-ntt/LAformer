@@ -747,7 +747,7 @@ class NuScenesData(SingleAgentDataset):
                     print(f'tmp_lane_midline_abs: {tmp_lane_midline_abs}')
                     print(f'tmp_lane_midline_rel: {tmp_lane_midline_rel}')
                     print(f'lane_traj_tokens[lane_idx]: {lane_traj_tokens[lane_idx]}')
-                    print_count += 1
+                print_count += 1
                 self.valid_lanes_midline_rel.append(np.array(tmp_lane_midline_rel))
                 self.valid_lanes_midline_abs.append(np.array(tmp_lane_midline_abs))
                 valid_lane_traj_tokens.append(lane_traj_tokens[lane_idx])
