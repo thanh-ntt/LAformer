@@ -409,7 +409,7 @@ class NuScenesData(SingleAgentDataset):
         # encode subdivided polygons
 
         print(f'len(self.subdivided_lane_traj_rel): {len(self.subdivided_lane_traj_rel)}')
-        pprint(self.subdivided_lane_traj_rel[0])
+        pprint(self.subdivided_lane_traj_rel[:3])
         for i_polygon, polygon in enumerate(self.subdivided_lane_traj_rel):
             start = len(self.vectors)
             for i_point, point in enumerate(polygon):
