@@ -234,8 +234,8 @@ class NuScenesData(SingleAgentDataset):
         #       all nearby lanes are retrieved by get_lanes_in_radius
         #       then, each lane is discretized into multiple lane poses
         self.lanes_midline_abs: List[List[Tuple[float, float, float]]] = []
-        self.valid_lanes_midlines_abs = []
-        self.valid_lanes_midlines_rel = []
+        self.valid_lanes_midline_abs = []
+        self.valid_lanes_midline_rel = []
         self.polygons = []
         self.stepwise_label = np.zeros((self.eval_frames))
         self.vectors = []
@@ -717,7 +717,7 @@ class NuScenesData(SingleAgentDataset):
         # polygons = self.get_polygons_around_agent()
         # flags = self.get_lane_flags(self.lanes_midlines_abs, polygons)
         # assert len(flags) == len(self.lanes_midlines_abs) == len(valid_lane_traj_tokens)
-        self.valid_lanes_midlines_abs = []
+        self.valid_lanes_midline_abs = []
 
         print(f'len(self.lanes_midlines_abs): {len(self.lanes_midline_abs)}')
         print(f'self.lanes_midlines_abs[0]: {self.lanes_midline_abs[0]}')
@@ -727,7 +727,9 @@ class NuScenesData(SingleAgentDataset):
             # rotate to get the relative (rel) coordinate from absolute (abs) coordinate
             # This conversion is necessary as get_lanes_in_radius
             #   return: Mapping from lane id to list of coordinate tuples in global coordinate system.
-            lane_midline_rel = np.array([rotate(coord[0] - self.cent_x, coord[1] - self.cent_y, self.angle) for coord in lane_midline_abs])
+            lane_midline_rel = np.array(
+                [rotate(coord[0] - self.cent_x, coord[1] - self.cent_y, self.angle) + (coord[2],) for coord in lane_midline_abs]
+            )
             tmp_lane_midline_rel = []
             tmp_lane_midline_abs = []
             for point_idx, coord in enumerate(lane_midline_rel):
@@ -742,18 +744,18 @@ class NuScenesData(SingleAgentDataset):
                     print(f'tmp_lane_midline_abs: {tmp_lane_midline_abs}')
                     print(f'tmp_lane_midline_rel: {tmp_lane_midline_rel}')
                     print_count += 1
-                self.valid_lanes_midlines_rel.append(np.array(tmp_lane_midline_rel))
-                self.valid_lanes_midlines_abs.append(np.array(tmp_lane_midline_abs))
+                self.valid_lanes_midline_rel.append(np.array(tmp_lane_midline_rel))
+                self.valid_lanes_midline_abs.append(np.array(tmp_lane_midline_abs))
                 valid_lane_traj_tokens.append(lane_traj_tokens[lane_idx])
 
         polygons = self.get_polygons_around_agent()
-        flags = self.get_lane_flags(self.valid_lanes_midlines_abs, polygons)
-        assert len(flags) == len(self.valid_lanes_midlines_abs) == len(valid_lane_traj_tokens) == len(self.valid_lanes_midlines_rel)
+        flags = self.get_lane_flags(self.valid_lanes_midline_abs, polygons)
+        assert len(flags) == len(self.valid_lanes_midline_abs) == len(valid_lane_traj_tokens) == len(self.valid_lanes_midline_rel)
 
         for i_flag, flag in enumerate(flags):
-            assert len(flag) == len(self.valid_lanes_midlines_rel[i_flag])
+            assert len(flag) == len(self.valid_lanes_midline_rel[i_flag])
 
-        for rel_li_idx, rel_li in enumerate(self.valid_lanes_midlines_rel):
+        for rel_li_idx, rel_li in enumerate(self.valid_lanes_midline_rel):
             if len(rel_li) > 1:
                 # assert len(rel_li) == len(self.valid_lanes_midlines_abs[rel_li_idx])
 
@@ -761,8 +763,8 @@ class NuScenesData(SingleAgentDataset):
                 idx = int(len(rel_li) / 2)
                 # idx = 0
                 attr = self.map.layers_on_point(
-                    self.valid_lanes_midlines_abs[rel_li_idx][idx][0],
-                    self.valid_lanes_midlines_abs[rel_li_idx][idx][1], layer_names=['road_segment', ])
+                    self.valid_lanes_midline_abs[rel_li_idx][idx][0],
+                    self.valid_lanes_midline_abs[rel_li_idx][idx][1], layer_names=['road_segment', ])
                 road_seg_attr = attr['road_segment']
                 # stop_line_attr = attr['stop_line']
                 if len(road_seg_attr) > 0:
@@ -781,7 +783,7 @@ class NuScenesData(SingleAgentDataset):
                 lane_poses = np.array([np.array((point[0], point[1]), dtype=float) for point in lane_poses])
                 curvature = get_arc_curve(lane_poses)
                 if curvature < 100:
-                    li = self.valid_lanes_midlines_abs[rel_li_idx]
+                    li = self.valid_lanes_midline_abs[rel_li_idx]
                     lane_angle = - math.atan2(li[1][1] - li[0][1], li[1][0] - li[0][0]) + math.pi / 2
                     origin_point = li[0]
                     end_point = li[-1]
@@ -813,7 +815,7 @@ class NuScenesData(SingleAgentDataset):
         self.rel_ind_2_abs_ind_offset = []
 
         total_lane_poses_num = 0
-        for lane_idx, lane_poses in enumerate(self.valid_lanes_midlines_rel):
+        for lane_idx, lane_poses in enumerate(self.valid_lanes_midline_rel):
             if len(lane_poses) <= 1:
                 continue
             # print(lane_idx)
