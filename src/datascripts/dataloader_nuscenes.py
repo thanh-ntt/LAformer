@@ -700,8 +700,8 @@ class NuScenesData(SingleAgentDataset):
         valid_lane_traj_tokens = []
         i = 0
         for lane_token, li in lanes.items():
-            if i % 100 == 0:
-                print(f'li: {li[0:10]}')
+            if i < 10:
+                print(f'li: {li}')
             i += 1
             li = [np.array([coord[0], coord[1]]) for coord in li]
             if len(li) > 1:
