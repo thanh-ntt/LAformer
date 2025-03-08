@@ -402,11 +402,11 @@ class NuScenesData(SingleAgentDataset):
         """
         self.get_lane_midlines()
         print(f'finish get_lane_midlines()')
-        print(f'len(self.subdivided_lane_traj_rel): {len(self.subdivided_lane_traj_rel)}')
         self.subdivide_lanes()
 
         # encode subdivided polygons
 
+        print(f'len(self.subdivided_lane_traj_rel): {len(self.subdivided_lane_traj_rel)}')
         for i_polygon, polygon in enumerate(self.subdivided_lane_traj_rel):
             start = len(self.vectors)
             for i_point, point in enumerate(polygon):
@@ -700,7 +700,7 @@ class NuScenesData(SingleAgentDataset):
         valid_lane_traj_tokens = []
         i = 0
         for lane_token, li in lanes.items():
-            if i < 10:
+            if i % 100 == 0:
                 print(f'li: {li}')
             i += 1
             li = [np.array([coord[0], coord[1]]) for coord in li]
@@ -721,6 +721,7 @@ class NuScenesData(SingleAgentDataset):
             #   return: Mapping from lane id to list of coordinate tuples in global coordinate system.
             rel_li = np.array([rotate(coord[0] - self.cent_x, coord[1] - self.cent_y, self.angle) for coord in li])
             if i % 10 == 0:
+                print(f'li (before rotation): {li[0]}')
                 print(f'rel_li (after rotation): {rel_li[0]}')
             i += 1
             tmp_rel_li = []
