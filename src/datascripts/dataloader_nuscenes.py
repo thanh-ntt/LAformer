@@ -704,7 +704,8 @@ class NuScenesData(SingleAgentDataset):
             if i % 100 == 0:
                 print(f'(i = {i}) li: {li[:2]}')
             i += 1
-            li = [np.array([coord[0], coord[1]]) for coord in li]
+            # TODO: add this back if error
+            # li = [np.array([coord[0], coord[1]]) for coord in li]
             if len(li) > 1:
                 self.lanes_midlines_abs.append(li)
                 lane_traj_tokens.append(lane_token)
@@ -715,6 +716,7 @@ class NuScenesData(SingleAgentDataset):
 
         i = 0
         print(f'len(self.lanes_midlines_abs): {len(self.lanes_midlines_abs)}')
+        print(f'self.lanes_midlines_abs[0]: {self.lanes_midlines_abs[0]}')
         print(f'self.angle: {self.angle}')
         for lane_idx, li in enumerate(self.lanes_midlines_abs):
             # rotate to get the relative (rel) coordinate from absolute (abs) coordinate
