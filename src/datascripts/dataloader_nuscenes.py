@@ -32,6 +32,7 @@ from nuscenes.map_expansion.map_api import NuScenesMap, discretize_lane
 from nuscenes.prediction.input_representation.static_layers import StaticLayerRasterizer, get_lanes_in_radius, correct_yaw, quaternion_yaw
 from nuscenes.prediction.input_representation.agents import *
 from shapely.geometry import Point
+from pprint import pprint
 
 map_extent = [-50, 50, -20, 80]
 
@@ -324,6 +325,8 @@ class NuScenesData(SingleAgentDataset):
         self.map = NuScenesMap(dataroot=self.args['dataroot'], map_name=self.location)
 
         ego_car_info = self.helper.get_sample_annotation(sample_token=self.sample_token, instance_token=self.instance_token)
+        print(f'ego_car_info: {ego_car_info}')
+        pprint(ego_car_info)
         self.cent_x, self.cent_y = ego_car_info['translation'][0], ego_car_info['translation'][1]  # global
         self.ego_past_traj_abs = self.helper.get_past_for_agent(self.instance_token, self.sample_token,
                                                        seconds=self.args['t_h'], in_agent_frame=False)[::-1]
