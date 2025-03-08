@@ -362,7 +362,7 @@ class NuScenesData(SingleAgentDataset):
         yaw = quaternion_yaw(Quaternion(ego_car_info['rotation']))
         yaws.extend([yaw])
         # yaws = [correct_yaw(yaw) for yaw in yaws]
-        self.angle = - np.array(yaws).mean() + math.pi / 2
+        self.angle = - np.array(yaws).mean() + math.pi / 2 # TODO: why use negative '-' here??
         assert len(self.ego_future_traj_abs) == 2 * self.args['t_f'] and len(self.ego_past_traj_abs) == 2 * self.args['t_h']
 
         self.ego_past_traj_rel =np.array([rotate(pos[0] - self.cent_x, pos[1] - self.cent_y, self.angle)
@@ -408,6 +408,9 @@ class NuScenesData(SingleAgentDataset):
         """
         self.get_lane_midlines()
         # print(f'finish get_lane_midlines()')
+        print(f"self.lanes_attrs['offset_angle_with_ego']: {self.lanes_attrs['offset_angle_with_ego']}")
+        print(f'self.angle: {self.angle}')
+        print(f'actual angle: {- (self.angle - math.pi / 2)}')
         self.subdivide_lanes()
 
         # encode subdivided polygons
@@ -546,7 +549,7 @@ class NuScenesData(SingleAgentDataset):
             scale=self.scale,
             eval_time=self.eval_frames,
 
-            angle=self.angle,
+            angle=self.angle, # self.angle needs to be offset & negate: true_angle = - (self.angle - math.pi / 2)
             cent_x=self.cent_x,
             cent_y=self.cent_y,
             origin_labels=self.ego_future_traj_abs,
@@ -701,7 +704,7 @@ class NuScenesData(SingleAgentDataset):
             "has_traffic_control": [],
             "turn_direction": [],
             "is_intersection": [],
-            "offset_angle_with_ego": None # TODO
+            "offset_angle_with_ego": 0
         }
 
         # list of token with index corresponding to self.lanes_midlines_abs's index
@@ -786,22 +789,17 @@ class NuScenesData(SingleAgentDataset):
                 lane_poses = discretize_lane(arcline, 1.0)
                 lane_poses = np.array([np.array((point[0], point[1]), dtype=float) for point in lane_poses])
                 curvature = get_arc_curve(lane_poses)
-                if rel_li_idx % 35 == 0: # TODO: remove this if when done debugging
-                    lane_poses = self.valid_lanes_midline_abs[rel_li_idx]
-                    # lane_angle = - math.atan2(lane_poses[1][1] - lane_poses[0][1], lane_poses[1][0] - lane_poses[0][0]) + math.pi / 2
-                    lane_angle = math.atan2(lane_poses[1][1] - lane_poses[0][1],
-                                              lane_poses[1][0] - lane_poses[0][0]) + math.pi / 2
-                    # This lane_angle is correct (checked 3 different lanes)
-                    #   ^ with offset of math.pi / 2 (taken from North, not East direction of circle)
-                    # print(f'valid_lane_traj_tokens[rel_li_idx]: {valid_lane_traj_tokens[rel_li_idx]}')
-                    # print(f'lane_angle: {lane_angle}')
-                    # TODO: why is rel_li[i][2] different from lane_angle?
-                    # print(f'rel_li: {rel_li}')
+
+                # compute lane_angle (note: lane angle is negated, not sure why need to negate)
+                #   ^ but to compute offset (difference) it's OK to keep '-'
+                li = self.valid_lanes_midline_abs[rel_li_idx]
+                lane_angle = - math.atan2(li[1][1] - li[0][1], li[1][0] - li[0][0]) + math.pi / 2
+
+                # compute difference between ego's angle (heading direction) and lane direction
+                offset_angle_with_ego = self.angle - lane_angle
+                self.lanes_attrs['offset_angle_with_ego'] = offset_angle_with_ego
+
                 if curvature < 100:
-                    li = self.valid_lanes_midline_abs[rel_li_idx]
-                    self.lanes_attrs['offset_angle_with_ego']\
-                        = self.angle - (math.atan2(li[1][1] - li[0][1], li[1][0] - li[0][0]) + math.pi / 2)
-                    lane_angle = - math.atan2(li[1][1] - li[0][1], li[1][0] - li[0][0]) + math.pi / 2
                     origin_point = li[0]
                     end_point = li[-1]
                     end_point = np.array(rotate(end_point[0] - origin_point[0], end_point[1] - origin_point[1], lane_angle))
