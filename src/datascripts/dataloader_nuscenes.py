@@ -331,7 +331,7 @@ class NuScenesData(SingleAgentDataset):
 
         # helper.get_sample_annotation always returns vehicle (`'vehicle' in ego_car_info['category_name']` always TRUE)
         ego_car_info = self.helper.get_sample_annotation(sample_token=self.sample_token, instance_token=self.instance_token)
-        print(f'ego_car_info: {ego_car_info}')
+        print(f'idx = {idx}, ego_car_info: {ego_car_info}')
         pprint(ego_car_info)
         self.cent_x, self.cent_y = ego_car_info['translation'][0], ego_car_info['translation'][1]  # global
         self.ego_past_traj_abs = self.helper.get_past_for_agent(self.instance_token, self.sample_token,
@@ -407,7 +407,7 @@ class NuScenesData(SingleAgentDataset):
         :param idx: data index
         """
         self.get_lane_midlines()
-        print(f'finish get_lane_midlines()')
+        # print(f'finish get_lane_midlines()')
         self.subdivide_lanes()
 
         # encode subdivided polygons
@@ -693,14 +693,15 @@ class NuScenesData(SingleAgentDataset):
         # get all lane (each with lane poses, discretized by 1.0m) from nearby lanes
         lanes = get_lanes_in_radius(x=self.cent_x, y=self.cent_y, radius=100,
                                       discretization_meters=1.0, map_api=self.map)
-        print(f'len(lanes): {len(lanes)}')
+        # print(f'len(lanes): {len(lanes)}')
         if len(lanes) == 0:
             print(f'reset self.mapping, cur self.mapping: {self.mapping}')
             self.mapping = None
         self.lanes_attrs = {
             "has_traffic_control": [],
             "turn_direction": [],
-            "is_intersection": []
+            "is_intersection": [],
+            "offset_angle_with_ego": None # TODO
         }
 
         # list of token with index corresponding to self.lanes_midlines_abs's index
@@ -710,9 +711,6 @@ class NuScenesData(SingleAgentDataset):
         i = 0
         print_count = 0
         for lane_token, lane_poses in lanes.items():
-            if i % 100 == 0:
-                print(f'(i = {i}) lane_poses[:3]: {lane_poses[:3]}')
-            i += 1
             # TODO: add this back if error
             # li = [np.array([coord[0], coord[1]]) for coord in li]
             if len(lane_poses) > 1:
@@ -743,13 +741,13 @@ class NuScenesData(SingleAgentDataset):
                     tmp_lane_midline_abs.append(lane_midline_abs[point_idx])
             assert len(tmp_lane_midline_abs) == len(tmp_lane_midline_rel)
             if len(tmp_lane_midline_rel) > 1:
-                if print_count % 35 == 0:
+                # if print_count % 35 == 0:
                     # print(f'lane_midline_abs: {lane_midline_abs}')
                     # print(f'lane_midline_rel: {lane_midline_rel}')
-                    print(f'tmp_lane_midline_abs: {tmp_lane_midline_abs}')
-                    print(f'tmp_lane_midline_rel: {tmp_lane_midline_rel}')
-                    print(f'lane_traj_tokens[lane_idx]: {lane_traj_tokens[lane_idx]}')
-                print_count += 1
+                    # print(f'tmp_lane_midline_abs: {tmp_lane_midline_abs}')
+                    # print(f'tmp_lane_midline_rel: {tmp_lane_midline_rel}')
+                    # print(f'lane_traj_tokens[lane_idx]: {lane_traj_tokens[lane_idx]}')
+                # print_count += 1
                 self.valid_lanes_midline_rel.append(np.array(tmp_lane_midline_rel))
                 self.valid_lanes_midline_abs.append(np.array(tmp_lane_midline_abs))
                 valid_lane_traj_tokens.append(lane_traj_tokens[lane_idx])
@@ -795,12 +793,14 @@ class NuScenesData(SingleAgentDataset):
                                               lane_poses[1][0] - lane_poses[0][0]) + math.pi / 2
                     # This lane_angle is correct (checked 3 different lanes)
                     #   ^ with offset of math.pi / 2 (taken from North, not East direction of circle)
-                    print(f'valid_lane_traj_tokens[rel_li_idx]: {valid_lane_traj_tokens[rel_li_idx]}')
-                    print(f'lane_angle: {lane_angle}')
+                    # print(f'valid_lane_traj_tokens[rel_li_idx]: {valid_lane_traj_tokens[rel_li_idx]}')
+                    # print(f'lane_angle: {lane_angle}')
                     # TODO: why is rel_li[i][2] different from lane_angle?
-                    print(f'rel_li: {rel_li}')
+                    # print(f'rel_li: {rel_li}')
                 if curvature < 100:
                     li = self.valid_lanes_midline_abs[rel_li_idx]
+                    self.lanes_attrs['offset_angle_with_ego']\
+                        = self.angle - (math.atan2(li[1][1] - li[0][1], li[1][0] - li[0][0]) + math.pi / 2)
                     lane_angle = - math.atan2(li[1][1] - li[0][1], li[1][0] - li[0][0]) + math.pi / 2
                     origin_point = li[0]
                     end_point = li[-1]
