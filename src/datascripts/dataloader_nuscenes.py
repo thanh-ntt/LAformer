@@ -792,6 +792,7 @@ class NuScenesData(SingleAgentDataset):
                     # This lane_angle is correct (checked 3 different lanes)
                     #   ^ with offset of math.pi / 2 (taken from North, not East direction of circle)
                     print(f'lane_angle: {lane_angle}')
+                    print(f'rel_li: {rel_li}')
                 if curvature < 100:
                     li = self.valid_lanes_midline_abs[rel_li_idx]
                     lane_angle = - math.atan2(li[1][1] - li[0][1], li[1][0] - li[0][0]) + math.pi / 2
