@@ -422,19 +422,14 @@ class NuScenesData(SingleAgentDataset):
         :param idx: data index
         """
         self.get_lane_midlines()
+        print(f'self.angle: {self.angle}, actual angle: {- (self.angle - math.pi / 2)}')
 
         self.compute_lane_attributes()
 
-        print(f'self.angle: {self.angle}')
-        print(f'actual angle: {- (self.angle - math.pi / 2)}')
-        print(f"self.lanes_attrs['offset_angle_with_ego']: {self.lanes_attrs['offset_angle_with_ego']}")
-
         self.subdivide_lanes()
-
         total_length = sum(len(lane) for lane in self.valid_lanes_midline_rel)
         print(f'total length (# lane poses) of all lanes in self.valid_lanes_midline_rel: {total_length}')
         print(f'len(self.subdivided_lane_traj_rel): {len(self.subdivided_lane_traj_rel)}')
-        pprint(self.subdivided_lane_traj_rel[:3])
 
         # encode subdivided polygons
         for i_polygon, polygon in enumerate(self.subdivided_lane_traj_rel):
@@ -738,8 +733,8 @@ class NuScenesData(SingleAgentDataset):
         """
 
         # self.subdivided_lane_traj_abs = []
-        self.subdivided_lane_traj_rel = [] # sliced lane segments, each segment is a list of lane poses (in relative coordinate)
-        self.subdivided_lane_2_origin_lane_labels = []
+        self.subdivided_lane_traj_rel = [] # sliced (valid) lane segments, each segment is a list of lane poses (in relative coordinate)
+        self.subdivided_lane_2_origin_lane_labels = [] # mapping to index of lane in valid_lane_traj_tokens
         self.rel_ind_2_abs_ind_offset = []
 
         for lane_idx, lane_poses in enumerate(self.valid_lanes_midline_rel):
@@ -748,7 +743,7 @@ class NuScenesData(SingleAgentDataset):
             # print(lane_idx)
             if lane_idx == 0:
                 print(f'lane_idx = {lane_idx}, lane_poses[:10]: {lane_poses[:10]}')
-                print(f'self.valid_lane_traj_tokens[lane_idx]: {self.valid_lane_traj_tokens[lane_idx]}')
+                print(f'self.valid_lane_traj_tokens[{lane_idx}]: {self.valid_lane_traj_tokens[lane_idx]}')
             self.divide_single_lane(lane_poses, lane_idx)
 
         self.subdivided_lane_traj_rel = np.array(self.subdivided_lane_traj_rel, dtype=object)
@@ -782,7 +777,7 @@ class NuScenesData(SingleAgentDataset):
             "has_traffic_control": [],
             "turn_direction": [],
             "is_intersection": [],
-            "offset_angle_with_ego": 0
+            "offset_angle_with_ego": []
         }
 
         # list of token with index corresponding to self.lanes_midlines_abs's index
@@ -810,8 +805,7 @@ class NuScenesData(SingleAgentDataset):
             # This conversion is necessary as get_lanes_in_radius
             #   return: Mapping from lane id to list of coordinate tuples in global coordinate system.
             lane_midline_rel = np.array(
-                [rotate(coord[0] - self.cent_x, coord[1] - self.cent_y, self.angle) + (coord[2] + math.pi / 2,)
-                 for coord in lane_midline_abs]
+                [rotate(coord[0] - self.cent_x, coord[1] - self.cent_y, self.angle) for coord in lane_midline_abs]
             )
             tmp_lane_midline_rel = []
             tmp_lane_midline_abs = []
@@ -915,8 +909,7 @@ class NuScenesData(SingleAgentDataset):
                 lane_angle = - math.atan2(li[1][1] - li[0][1], li[1][0] - li[0][0]) + math.pi / 2
 
                 # compute difference between ego's angle (heading direction) and lane direction
-                offset_angle_with_ego = self.angle - lane_angle
-                self.lanes_attrs['offset_angle_with_ego'] = offset_angle_with_ego
+                self.lanes_attrs['offset_angle_with_ego'].append(self.angle - lane_angle)
 
                 if curvature < 100:
                     origin_point = li[0]
