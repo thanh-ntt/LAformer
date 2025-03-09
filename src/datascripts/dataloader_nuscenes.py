@@ -193,6 +193,9 @@ class NuScenesData(SingleAgentDataset):
         self.rf_is_observed = True
         self.subdivide = True
         self.semantic_lane = True
+
+        # paper: "Specifically, the length of each lane centerline segment is cut into 5 meters
+        # or remains as the original length if the lane is shorter than 5 meters"
         self.subdivide_len = 5
         self.scale = 1.0
         self.vector_size = 32
@@ -236,8 +239,10 @@ class NuScenesData(SingleAgentDataset):
         #       then, each lane is discretized into multiple lane poses
         self.lanes_midline_abs: List[List[Tuple[float, float, float]]] = []
         self.valid_lanes_midline_abs = []
+
+        # list of lanes (after filtered), converted to relative coordinate from self.lanes_midline_abs
         self.valid_lanes_midline_rel = []
-        self.valid_lane_traj_tokens = []
+        self.valid_lane_traj_tokens = [] # corresponding lane token from self.valid_lanes_midline_rel
         self.polygons = []
         self.stepwise_label = np.zeros((self.eval_frames))
         self.vectors = []
@@ -332,7 +337,7 @@ class NuScenesData(SingleAgentDataset):
 
         # helper.get_sample_annotation always returns vehicle (`'vehicle' in ego_car_info['category_name']` always TRUE)
         ego_car_info = self.helper.get_sample_annotation(sample_token=self.sample_token, instance_token=self.instance_token)
-        print(f'idx = {idx}, ego_car_info: {ego_car_info}')
+        print(f'idx = {idx}, ego_car_info:')
         pprint(ego_car_info)
         self.cent_x, self.cent_y = ego_car_info['translation'][0], ego_car_info['translation'][1]  # global
         self.ego_past_traj_abs = self.helper.get_past_for_agent(self.instance_token, self.sample_token,
@@ -408,16 +413,21 @@ class NuScenesData(SingleAgentDataset):
         :param idx: data index
         """
         self.get_lane_midlines()
-        # print(f'finish get_lane_midlines()')
-        print(f"self.lanes_attrs['offset_angle_with_ego']: {self.lanes_attrs['offset_angle_with_ego']}")
+
+        self.compute_lane_attributes()
+
         print(f'self.angle: {self.angle}')
         print(f'actual angle: {- (self.angle - math.pi / 2)}')
+        print(f"self.lanes_attrs['offset_angle_with_ego']: {self.lanes_attrs['offset_angle_with_ego']}")
+
         self.subdivide_lanes()
 
-        # encode subdivided polygons
-
+        total_length = sum(len(lane) for lane in self.valid_lanes_midline_rel)
+        print(f'total length (# lane poses) of all lanes in self.valid_lanes_midline_rel: {total_length}')
         print(f'len(self.subdivided_lane_traj_rel): {len(self.subdivided_lane_traj_rel)}')
         pprint(self.subdivided_lane_traj_rel[:3])
+
+        # encode subdivided polygons
         for i_polygon, polygon in enumerate(self.subdivided_lane_traj_rel):
             start = len(self.vectors)
             for i_point, point in enumerate(polygon):
@@ -653,41 +663,91 @@ class NuScenesData(SingleAgentDataset):
 
         return 0
 
+    def divide_single_lane(self, lane_poses, l_id):
+        """
+        divide / slice a single lane
+        Args:
+            lane_poses: the trajectory of a lane <= this is list of lane poses
+            l_id: the lane index of the origin lane
+
+        Populate variables:
+            self.subdivided_lane_traj_rel
+            self.subdivided_lane_2_origin_lane_labels
+            self.rel_ind_2_abs_ind_offset
+        """
+        left_index = 0
+        length = len(lane_poses)
+        bound = self.subdivide_len
+        # print(length)
+        while True:
+            if length - left_index >= bound:
+                self.subdivided_lane_traj_rel.append(lane_poses[left_index:left_index + bound])
+                self.subdivided_lane_2_origin_lane_labels.append(l_id)
+
+                if len(self.subdivided_lane_2_origin_lane_labels) == 1 or \
+                        self.subdivided_lane_2_origin_lane_labels[-1] != self.subdivided_lane_2_origin_lane_labels[
+                    -2]:
+                    self.rel_ind_2_abs_ind_offset.append(0)
+                else:
+                    self.rel_ind_2_abs_ind_offset.append(
+                        self.rel_ind_2_abs_ind_offset[-1] + len(self.subdivided_lane_traj_rel[-2]))
+
+                left_index += bound
+            elif 1 < length - left_index < bound:
+                self.subdivided_lane_traj_rel.append(lane_poses[left_index:])
+                self.subdivided_lane_2_origin_lane_labels.append(l_id)
+
+                if len(self.subdivided_lane_2_origin_lane_labels) == 1 or \
+                        self.subdivided_lane_2_origin_lane_labels[-1] != self.subdivided_lane_2_origin_lane_labels[
+                    -2]:
+                    self.rel_ind_2_abs_ind_offset.append(0)
+                else:
+                    self.rel_ind_2_abs_ind_offset.append(
+                        self.rel_ind_2_abs_ind_offset[-1] + len(self.subdivided_lane_traj_rel[-2]))
+                break
+            else:
+                break
+        return 0
+
+    def subdivide_lanes(self):
+        """
+        slice (subdivide) each lane into lane segments
+        subdivide all the lanes acquired by function "get_lane_midlines"
+
+        Why need to subdivide again after calling get_lanes_in_radius (internally invoke discretize_lane)?
+            => Because discretize_lane returns lane poses length 1, in the paper we ultimately want
+            sliced lane segments of length 5. We still want to keep all (5) lane poses inside each segment,
+            not just a single lane pose for each 5-meter segment
+        """
+
+        # self.subdivided_lane_traj_abs = []
+        self.subdivided_lane_traj_rel = [] # sliced lane segments, each segment is a list of lane poses (in relative coordinate)
+        self.subdivided_lane_2_origin_lane_labels = []
+        self.rel_ind_2_abs_ind_offset = []
+
+        for lane_idx, lane_poses in enumerate(self.valid_lanes_midline_rel):
+            if len(lane_poses) <= 1:
+                continue
+            # print(lane_idx)
+            if lane_idx == 0:
+                print(f'lane_idx = {lane_idx}, lane_poses[:10]: {lane_poses[:10]}')
+                print(f'self.valid_lane_traj_tokens[lane_idx]: {self.valid_lane_traj_tokens[lane_idx]}')
+            self.divide_single_lane(lane_poses, lane_idx)
+
+        self.subdivided_lane_traj_rel = np.array(self.subdivided_lane_traj_rel, dtype=object)
+
+        assert len(self.subdivided_lane_2_origin_lane_labels) == len(self.subdivided_lane_traj_rel)
+
     def get_lane_midlines(self):
         """
-        get the midline points of all lanes in surrounding area
+        Get nearby lanes (as lane poses), rotate lanes to relative coordinate, filter lanes with single lane pose.
+
+        populate the following variables:
+            self.lanes_midline_abs
+            self.valid_lanes_midline_abs
+            self.valid_lanes_midline_rel
+            self.valid_lane_traj_tokens
         """
-        def get_arc_curve(pts)->float:
-            """
-            get the arc of a curve defined bypts
-            Args:
-                pts: points of curve
-            Returns:
-                the arc
-            """
-            # calculate the length of the chord
-            start = np.array(pts[0])
-            end = np.array(pts[len(pts) - 1])
-            l_arc = np.sqrt(np.sum(np.power(end - start, 2)))
-
-            # cal the max dis between points on chord and the line
-            # function: \frac{1}{2a}\sqrt{(a+b+c)(a+b-c)(a+c-b)(b+c-a)}
-            a = l_arc
-            b = np.sqrt(np.sum(np.power(pts - start, 2), axis=1))
-            c = np.sqrt(np.sum(np.power(pts - end, 2), axis=1))
-            tmp = (a + b + c) * (a + b - c) * (a + c - b) * (b + c - a)
-
-            if (abs(tmp) < 1e-6).all():
-                return 10000
-
-            dist = np.sqrt(tmp) / (2 * a)
-
-            h = dist.max()
-
-            r = ((a * a) / 4 + h * h) / (2 * h)
-
-            return r
-
         # leftdown, rightup
         scene_x_min = - 50
         scene_x_max = 50
@@ -727,7 +787,7 @@ class NuScenesData(SingleAgentDataset):
         # print(f'len(self.lanes_midlines_abs): {len(self.lanes_midline_abs)}')
         # print(f'self.lanes_midlines_abs[0]: {self.lanes_midline_abs[0]}')
         print(f'self.angle: {self.angle}')
-        # self.lanes_midlines_abs:
+        # Rotate lanes to relative coordinate
         for lane_idx, lane_midline_abs in enumerate(self.lanes_midline_abs):
             # rotate to get the relative (rel) coordinate from absolute (abs) coordinate
             # This conversion is necessary as get_lanes_in_radius
@@ -739,10 +799,13 @@ class NuScenesData(SingleAgentDataset):
             tmp_lane_midline_rel = []
             tmp_lane_midline_abs = []
             for point_idx, coord in enumerate(lane_midline_rel):
+                # coord[2] is not the correct angle - true angle = (coord[2] - math.pi / 2)
                 if scene_x_min <= coord[0] <= scene_x_max and scene_y_min <= coord[1] <= scene_y_max:
                     tmp_lane_midline_rel.append(coord)
                     tmp_lane_midline_abs.append(lane_midline_abs[point_idx])
             assert len(tmp_lane_midline_abs) == len(tmp_lane_midline_rel)
+
+            # Filter lanes with single lane pose
             if len(tmp_lane_midline_rel) > 1:
                 # if print_count % 35 == 0:
                     # print(f'lane_midline_abs: {lane_midline_abs}')
@@ -755,13 +818,52 @@ class NuScenesData(SingleAgentDataset):
                 self.valid_lanes_midline_abs.append(np.array(tmp_lane_midline_abs))
                 self.valid_lane_traj_tokens.append(lane_traj_tokens[lane_idx])
 
+        return 0
+
+    def compute_lane_attributes(self):
+        """
+        compute additional lane attributes
+
+        populate self.lanes_attrs
+        """
+        def get_arc_curve(pts)->float:
+            """
+            get the arc of a curve defined by pts
+            Args:
+                pts: points of curve
+            Returns:
+                the arc
+            """
+            # calculate the length of the chord
+            start = np.array(pts[0])
+            end = np.array(pts[len(pts) - 1])
+            l_arc = np.sqrt(np.sum(np.power(end - start, 2)))
+
+            # cal the max dis between points on chord and the line
+            # function: \frac{1}{2a}\sqrt{(a+b+c)(a+b-c)(a+c-b)(b+c-a)}
+            a = l_arc
+            b = np.sqrt(np.sum(np.power(pts - start, 2), axis=1))
+            c = np.sqrt(np.sum(np.power(pts - end, 2), axis=1))
+            tmp = (a + b + c) * (a + b - c) * (a + c - b) * (b + c - a)
+
+            if (abs(tmp) < 1e-6).all():
+                return 10000
+
+            dist = np.sqrt(tmp) / (2 * a)
+
+            h = dist.max()
+
+            r = ((a * a) / 4 + h * h) / (2 * h)
+
+            return r
+
         polygons = self.get_polygons_around_agent()
         flags = self.get_lane_flags(self.valid_lanes_midline_abs, polygons)
-        assert len(flags) == len(self.valid_lanes_midline_abs) == len(self.valid_lane_traj_tokens) == len(self.valid_lanes_midline_rel)
-
+        assert len(flags) == len(self.valid_lanes_midline_abs) == len(self.valid_lane_traj_tokens) == len(
+            self.valid_lanes_midline_rel)
         for i_flag, flag in enumerate(flags):
             assert len(flag) == len(self.valid_lanes_midline_rel[i_flag])
-
+        # compute additional lane attributes
         for rel_li_idx, rel_li in enumerate(self.valid_lanes_midline_rel):
             if len(rel_li) > 1:
                 # assert len(rel_li) == len(self.valid_lanes_midlines_abs[rel_li_idx])
@@ -802,7 +904,8 @@ class NuScenesData(SingleAgentDataset):
                 if curvature < 100:
                     origin_point = li[0]
                     end_point = li[-1]
-                    end_point = np.array(rotate(end_point[0] - origin_point[0], end_point[1] - origin_point[1], lane_angle))
+                    end_point = np.array(
+                        rotate(end_point[0] - origin_point[0], end_point[1] - origin_point[1], lane_angle))
                     if end_point[0] > 0:
                         direction = 'R'
                     else:
@@ -814,73 +917,7 @@ class NuScenesData(SingleAgentDataset):
 
                 # get 'has_traffic_control' attribute
                 self.lanes_attrs['has_traffic_control'].append(flags[rel_li_idx])
-
         self.map_extent = [-50, 50, -50, 150]
-
-        return 0
-
-    def subdivide_lanes(self):
-        """
-        subdivide all the lanes acquired by function "get_lane_midlines"
-        """
-        # TODO: why need to subdivide again after calling get_lanes_in_radius (internally invoke discretize_lane)?
-        # self.subdivided_lane_traj_abs = []
-        self.subdivided_lane_traj_rel = []
-        self.subdivided_lane_2_origin_lane_labels = []
-        self.rel_ind_2_abs_ind_offset = []
-
-        total_lane_poses_num = 0
-        for lane_idx, lane_poses in enumerate(self.valid_lanes_midline_rel):
-            if len(lane_poses) <= 1:
-                continue
-            # print(lane_idx)
-            total_lane_poses_num += len(lane_poses)
-            if lane_idx == 0:
-                print(f'lane_idx = {lane_idx}, lane_poses[:10]: {lane_poses[:10]}')
-                print(f'self.valid_lane_traj_tokens[lane_idx]: {self.valid_lane_traj_tokens[lane_idx]}')
-            self.divide_lane(lane_poses, lane_idx)
-
-        print(f'total_lane_poses_num: {total_lane_poses_num}')
-        self.subdivided_lane_traj_rel = np.array(self.subdivided_lane_traj_rel, dtype=object)
-
-        assert len(self.subdivided_lane_2_origin_lane_labels) == len(self.subdivided_lane_traj_rel)
-
-    def divide_lane(self, lane_poses, l_id):
-        """
-        divide a lane
-        Args:
-            lane_poses: the trajectory of a lane <= this is list of lane poses
-            l_id: the lane index of the origin lane
-        """
-        left_index = 0
-        length = len(lane_poses)
-        bound = self.subdivide_len 
-        # print(length)
-        while True:
-            if length - left_index >= bound:
-                self.subdivided_lane_traj_rel.append(lane_poses[left_index:left_index + bound])
-                self.subdivided_lane_2_origin_lane_labels.append(l_id)
-
-                if len(self.subdivided_lane_2_origin_lane_labels) == 1 or \
-                        self.subdivided_lane_2_origin_lane_labels[-1] != self.subdivided_lane_2_origin_lane_labels[-2]:
-                    self.rel_ind_2_abs_ind_offset.append(0)
-                else:
-                    self.rel_ind_2_abs_ind_offset.append(self.rel_ind_2_abs_ind_offset[-1] + len(self.subdivided_lane_traj_rel[-2]))
-
-                left_index += bound
-            elif 1 < length - left_index < bound:
-                self.subdivided_lane_traj_rel.append(lane_poses[left_index:])
-                self.subdivided_lane_2_origin_lane_labels.append(l_id)
-
-                if len(self.subdivided_lane_2_origin_lane_labels) == 1 or \
-                        self.subdivided_lane_2_origin_lane_labels[-1] != self.subdivided_lane_2_origin_lane_labels[-2]:
-                    self.rel_ind_2_abs_ind_offset.append(0)
-                else:
-                    self.rel_ind_2_abs_ind_offset.append(self.rel_ind_2_abs_ind_offset[-1] + len(self.subdivided_lane_traj_rel[-2]))
-                break
-            else:
-                break
-        return 0
 
     def get_polygons_around_agent(self) -> Dict:
         """
