@@ -203,10 +203,16 @@ class NuScenesData(SingleAgentDataset):
         if self.args['img_only'] and self.args['mapping_only']:
             raise Exception("conflicting args: \"img_only\" and \"mapping_only\"")
 
-        # nuScenes sample and instance tokens for prediction challenge
-        # {instance_token}_{sample_token}
+        # Get a list of agents in the split for the challenge
+        #   (agents are indexed by an instance token and a sample token - {instance_token}_{sample_token})
+        #   agentID = {instance_token}_{sample_token} ~ basically agentID = objectID + timestamp
+        #       instance: an object instance, e.g. particular vehicle <= to be predicted by AV model
+        #           (1 instance have multiple annotated samples)
+        #       sample: a scene at a timestamp (with references to other information about the scene at that timestamp)
+        #
+        #   1 test case in challenge = 1 agent at a particular timestamp for an instance
         self.token_list = get_prediction_challenge_split(self.args['split'], dataroot=self.helper.data.dataroot)
-        print(f"length of data: {len(self.token_list)}")
+        print(f"# agents in the current split: len(self.token_list): {len(self.token_list)}")
 
         # Past and prediction horizons
 
@@ -244,6 +250,9 @@ class NuScenesData(SingleAgentDataset):
         self.valid_lanes_midline_rel = []
         self.valid_lane_traj_tokens = [] # corresponding lane token from self.valid_lanes_midline_rel
         self.polygons = []
+
+        # Ground truth label of the lane scores at each time step in the future
+        # self.stepwise_label[i] = index in self.subdivided_lane_traj_rel of the ground-truth lane segment
         self.stepwise_label = np.zeros((self.eval_frames))
         self.vectors = []
         self.polyline_spans = []
@@ -540,6 +549,11 @@ class NuScenesData(SingleAgentDataset):
             else:
                 label = np.argmin([min(get_dis_list(lane, pose_at_index)) for lane in self.subdivided_lane_traj_rel])
             self.stepwise_label[index] = label
+            print(f'self.stepwise_label[{index}]: {self.stepwise_label[index]}')
+            print(f'self.subdivided_lane_traj_rel[index]: {self.subdivided_lane_traj_rel[index]}')
+            original_lane_idx = self.subdivided_lane_2_origin_lane_labels[index]
+            print(f'original_lane_idx: {original_lane_idx}')
+            print(f'self.valid_lane_traj_tokens[original_lane_idx]: {self.valid_lane_traj_tokens[original_lane_idx]}')
         agent_goal_poses = self.ego_future_traj_rel[2*self.args['t_f'] - 1]
         if len(self.agents_past_traj_rel) == 0:
             label = 0
@@ -565,7 +579,7 @@ class NuScenesData(SingleAgentDataset):
             cent_y=self.cent_y,
             origin_labels=self.ego_future_traj_abs,
             labels=self.ego_future_traj_rel,
-            labels_is_valid=self.label_is_valid,
+            labels_is_valid=self.label_is_valid, # deprecated variable (always true)
             past_traj=self.ego_past_traj_rel,
             trajs=self.agents_past_traj_rel,
             polygons=self.subdivided_lane_traj_rel,
@@ -786,7 +800,7 @@ class NuScenesData(SingleAgentDataset):
 
         # print(f'len(self.lanes_midlines_abs): {len(self.lanes_midline_abs)}')
         # print(f'self.lanes_midlines_abs[0]: {self.lanes_midline_abs[0]}')
-        print(f'self.angle: {self.angle}')
+        # print(f'self.angle: {self.angle}')
         # Rotate lanes to relative coordinate
         for lane_idx, lane_midline_abs in enumerate(self.lanes_midline_abs):
             # rotate to get the relative (rel) coordinate from absolute (abs) coordinate
