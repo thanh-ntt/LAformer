@@ -549,9 +549,9 @@ class NuScenesData(SingleAgentDataset):
             else:
                 label = np.argmin([min(get_dis_list(lane, pose_at_index)) for lane in self.subdivided_lane_traj_rel])
             self.stepwise_label[index] = label
-            print(f'self.stepwise_label[{index}]: {self.stepwise_label[index]}')
-            print(f'self.subdivided_lane_traj_rel[index]: {self.subdivided_lane_traj_rel[index]}')
-            original_lane_idx = self.subdivided_lane_2_origin_lane_labels[index]
+            print(f'self.stepwise_label[{index}]: {label}')
+            print(f'self.subdivided_lane_traj_rel[index]: {self.subdivided_lane_traj_rel[label]}')
+            original_lane_idx = self.subdivided_lane_2_origin_lane_labels[label]
             print(f'original_lane_idx: {original_lane_idx}')
             print(f'self.valid_lane_traj_tokens[original_lane_idx]: {self.valid_lane_traj_tokens[original_lane_idx]}')
         agent_goal_poses = self.ego_future_traj_rel[2*self.args['t_f'] - 1]
