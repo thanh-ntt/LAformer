@@ -244,10 +244,10 @@ class NuScenesData(SingleAgentDataset):
         #       all nearby lanes are retrieved by get_lanes_in_radius
         #       then, each lane is discretized into multiple lane poses
         self.lanes_midline_abs: List[List[Tuple[float, float, float]]] = []
-        self.valid_lanes_midline_abs = []
+        self.valid_lanes_midline_abs = [] # true_angle_abs (3rd element in each list) = x - pi/2
 
         # list of lanes (after filtered), converted to relative coordinate from self.lanes_midline_abs
-        self.valid_lanes_midline_rel = []
+        self.valid_lanes_midline_rel = [] # true_angle_rel (3rd element in each list) = x - pi/2
         self.valid_lane_traj_tokens = [] # corresponding lane token from self.valid_lanes_midline_rel
         self.polygons = []
 
@@ -554,7 +554,8 @@ class NuScenesData(SingleAgentDataset):
             print(f'self.subdivided_lane_traj_rel[{label}]: {self.subdivided_lane_traj_rel[label]}')
             original_lane_idx = self.subdivided_lane_2_origin_lane_labels[label]
             print(f'original_lane_idx: {original_lane_idx}')
-            print(f'self.valid_lane_traj_tokens[original_lane_idx]: {self.valid_lane_traj_tokens[original_lane_idx]}')
+            print(f'self.valid_lane_traj_tokens[{original_lane_idx}]: {self.valid_lane_traj_tokens[original_lane_idx]}')
+            print(f'self.valid_lanes_midline_abs[{original_lane_idx}]: {self.valid_lanes_midline_abs[original_lane_idx]}')
             print(f'-------------------------------------------------------')
         agent_goal_poses = self.ego_future_traj_rel[2*self.args['t_f'] - 1]
         if len(self.agents_past_traj_rel) == 0:
