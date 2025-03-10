@@ -323,7 +323,7 @@ class GRUDecoder(nn.Module):
         city_name = utils.get_from_mapping(mapping, 'city_name')
         angle = utils.get_from_mapping(mapping, 'angle')
         print(f'instance_token: {instance_token}\nsample_token: {sample_token}\n'
-              f'city_name: {city_name}\nangle: {angle}\nactual angle: {- (self.angle - math.pi / 2)}')
+              f'city_name: {city_name}\nangle: {angle}\nactual angle: {- (angle - math.pi / 2)}')
 
         labels = utils.get_from_mapping(mapping, 'labels')
         labels_is_valid = utils.get_from_mapping(mapping, 'labels_is_valid')
