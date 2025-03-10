@@ -216,7 +216,7 @@ class NuScenesData(SingleAgentDataset):
         #
         #   1 test case in challenge = 1 agent at a particular timestamp for an instance
         self.token_list = get_prediction_challenge_split(self.args['split'], dataroot=self.helper.data.dataroot)
-        print(f"# agents in the current split: len(self.token_list): {len(self.token_list)}")
+        # print(f"# agents in the current split: len(self.token_list): {len(self.token_list)}")
 
         # Past and prediction horizons
 
@@ -361,9 +361,9 @@ class NuScenesData(SingleAgentDataset):
 
         # helper.get_sample_annotation always returns vehicle (`'vehicle' in ego_car_info['category_name']` always TRUE)
         ego_car_info = self.helper.get_sample_annotation(sample_token=self.sample_token, instance_token=self.instance_token)
-        print('---------------------------------------------')
-        print(f'idx = {idx}, ego_car_info:')
-        pprint(ego_car_info)
+        # print('---------------------------------------------')
+        # print(f'idx = {idx}, ego_car_info:')
+        # pprint(ego_car_info)
         self.cent_x, self.cent_y = ego_car_info['translation'][0], ego_car_info['translation'][1]  # global
         self.ego_past_traj_abs = self.helper.get_past_for_agent(self.instance_token, self.sample_token,
                                                        seconds=self.args['t_h'], in_agent_frame=False)[::-1]
@@ -438,7 +438,7 @@ class NuScenesData(SingleAgentDataset):
         :param idx: data index
         """
         self.get_lane_midlines()
-        print(f'self.angle: {self.angle}, actual angle: {- (self.angle - math.pi / 2)}')
+        # print(f'self.angle: {self.angle}, actual angle: {- (self.angle - math.pi / 2)}')
 
         self.compute_lane_attributes()
 
@@ -561,7 +561,7 @@ class NuScenesData(SingleAgentDataset):
             # print(f'-------------------------------------------------------')
             # lane_idx_2 = self.subdivided_lane_to_idx2[gt_lane_segment_idx3]
             # print(f'self.valid_lanes_midline_abs[{lane_idx_2}]: {self.valid_lanes_midline_abs[lane_idx_2]}')
-            print(f'self.subdivided_lane_to_lane_meta[{gt_lane_segment_idx3}]: {self.subdivided_lane_to_lane_meta[gt_lane_segment_idx3]}')
+            # print(f'self.subdivided_lane_to_lane_meta[{gt_lane_segment_idx3}]: {self.subdivided_lane_to_lane_meta[gt_lane_segment_idx3]}')
             # ^ above indexing are correct (verified)
         agent_goal_poses = self.ego_future_traj_rel[2*self.args['t_f'] - 1]
         if len(self.agents_past_traj_rel) == 0:
