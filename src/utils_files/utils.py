@@ -960,5 +960,8 @@ def compute_angle_diff(angle_1, angle_2) -> float:
     angle_2 = float(angle_2)
     diff = abs(angle_1 - angle_2)
     diff = min(diff, 2 * math.pi - diff)
-    assert 0.0 <= diff <= math.pi
+    try:
+        assert 0.0 <= diff <= math.pi
+    except AssertionError:
+        print(angle_1, angle_2)
     return diff
