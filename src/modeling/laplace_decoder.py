@@ -140,11 +140,11 @@ class GRUDecoder(nn.Module):
         Returns:
             tensor: candidate lane encodings C = ConCat{c_{1:k}, s^_{1:k}}^{t_f}_{t=1}
         """
-        print(f'lane_states_batch.shape: {lane_states_batch.shape}')
-        print(f'len(lane_states_length): {len(lane_states_length)}')
-        print(f'lane_states_length: {lane_states_length}')
-        print(f'element_hidden_states.shape: {element_hidden_states.shape}')
-        print(f'global_hidden_states.shape: {global_hidden_states.shape}')
+        # print(f'lane_states_batch.shape: {lane_states_batch.shape}')
+        # print(f'len(lane_states_length): {len(lane_states_length)}')
+        # print(f'lane_states_length: {lane_states_length}')
+        # print(f'element_hidden_states.shape: {element_hidden_states.shape}')
+        # print(f'global_hidden_states.shape: {global_hidden_states.shape}')
         def compute_dense_lane_scores():
             """predict score of the j-th lane segment at future time step t
 
@@ -171,7 +171,7 @@ class GRUDecoder(nn.Module):
             # TODO: why the element-wise addiction '+'?
             lane_states_batch_attention = lane_states_batch + self.dense_label_cross_attention(
                 lane_states_batch, element_hidden_states.unsqueeze(0), tgt_key_padding_mask=src_attention_mask_lane)
-            print(f'lane_states_batch_attention.shape: {lane_states_batch_attention.shape}')
+            # print(f'lane_states_batch_attention.shape: {lane_states_batch_attention.shape}')
 
             # self.dense_lane_decoder: \theta = 2-layer MLP to process:
             #   1. h_i: agent motion encoding
@@ -185,12 +185,12 @@ class GRUDecoder(nn.Module):
             #   t_f: future_steps / future_frame_num (default value = 12)
             dense_lane_scores = self.dense_lane_decoder(torch.cat([global_hidden_states.unsqueeze(0).expand(
                 lane_states_batch.shape), lane_states_batch, lane_states_batch_attention], dim=-1)) # [max_len, N, H]
-            print(f'(1) dense_lane_scores.shape: {dense_lane_scores.shape}')
+            # print(f'(1) dense_lane_scores.shape: {dense_lane_scores.shape}')
 
             # lane-scoring head
             # s^_{j,t} = softmax(\theta{ h_i, c_j, A_{i,j} }) <= this does not change shape of the tensor
             dense_lane_scores = F.log_softmax(dense_lane_scores, dim=0)
-            print(f'(2) dense_lane_scores.shape: {dense_lane_scores.shape}')
+            # print(f'(2) dense_lane_scores.shape: {dense_lane_scores.shape}')
             return dense_lane_scores # [seq_len, batch, future_steps] = [max_len, N, H]
 
         def check_rules_lane_segments():
@@ -202,8 +202,8 @@ class GRUDecoder(nn.Module):
             pass
         max_vector_num = lane_states_batch.shape[1]
         batch_size = len(mapping)
-        print(f'batch_size: {batch_size}')
-        print('mapping[0].keys():')
+        # print(f'batch_size: {batch_size}')
+        # print('mapping[0].keys():')
         pprint(mapping[0].keys())
         src_attention_mask_lane = torch.zeros([batch_size, lane_states_batch.shape[1]], device=device) # [N, max_len]
         for i in range(batch_size):
@@ -211,16 +211,16 @@ class GRUDecoder(nn.Module):
             src_attention_mask_lane[i, :lane_states_length[i]] = 1
         src_attention_mask_lane = src_attention_mask_lane == 0
         lane_states_batch = lane_states_batch.permute(1, 0, 2) # [max_len, N, feature]
-        print(f'lane_states_batch.shape: {lane_states_batch.shape}')
+        # print(f'lane_states_batch.shape: {lane_states_batch.shape}')
         dense_lane_pred = compute_dense_lane_scores() # [max_len, N, H]
-        print(f'(1) dense_lane_pred.shape: {dense_lane_pred.shape}')
+        # print(f'(1) dense_lane_pred.shape: {dense_lane_pred.shape}')
         dense_lane_pred = dense_lane_pred.permute(1, 0, 2) # [N, max_len, H]
-        print(f'(2) dense_lane_pred.shape: {dense_lane_pred.shape}')
+        # print(f'(2) dense_lane_pred.shape: {dense_lane_pred.shape}')
         lane_states_batch = lane_states_batch.permute(1, 0, 2) # [N, max_len, feature]
         dense_lane_pred =  dense_lane_pred.permute(0, 2, 1) # [N, H, max_len]
-        print(f'(3) dense_lane_pred.shape: {dense_lane_pred.shape}')
+        # print(f'(3) dense_lane_pred.shape: {dense_lane_pred.shape}')
         dense_lane_pred = dense_lane_pred.contiguous().view(-1, max_vector_num)  # [N*H, max_len]
-        print(f'(4) dense_lane_pred.shape: {dense_lane_pred.shape}')
+        # print(f'(4) dense_lane_pred.shape: {dense_lane_pred.shape}')
 
         # dense_lane_pred: prediction about the probability of each lane segment index that the agent will go to
         #       ^ that's why size = [N*H, max_len] <= max_len is # lane segments
@@ -246,9 +246,9 @@ class GRUDecoder(nn.Module):
 
         mink = self.args.topk
         dense_lane_topk = torch.zeros((dense_lane_pred.shape[0], mink, self.hidden_size), device=device) # [N*H, mink, hidden_size]
-        print(f'(1) dense_lane_topk.shape: {dense_lane_topk.shape}')
+        # print(f'(1) dense_lane_topk.shape: {dense_lane_topk.shape}')
         dense_lane_topk_scores = torch.zeros((dense_lane_pred.shape[0], mink), device=device)   # [N*H, mink]
-        print(f'dense_lane_topk_scores.shape: {dense_lane_topk_scores.shape}')
+        # print(f'dense_lane_topk_scores.shape: {dense_lane_topk_scores.shape}')
 
         subdivided_lane_to_lane_meta = utils.get_from_mapping(mapping, 'subdivided_lane_to_lane_meta')
 
@@ -277,8 +277,8 @@ class GRUDecoder(nn.Module):
                 if compute_angle_diff(lane_angle, ego_angle_abs) > (math.pi * 4 / 5):
                     self.angle_diff_debug_num += 1
 
-        print(f'lane_segment_num: {self.lane_segment_num}, angle_diff_num: {self.angle_diff_num}')
-        print(f'lane_segment_debug_num: {self.lane_segment_debug_num}, angle_diff_debug_num: {self.angle_diff_debug_num}')
+        print(f'lane_segment_num: {self.lane_segment_num}, angle_diff_num: {self.angle_diff_num}, % = {self.angle_diff_debug_num / self.lane_segment_num}')
+        print(f'lane_segment_debug_num: {self.lane_segment_debug_num}, angle_diff_debug_num: {self.angle_diff_debug_num}, % = {self.angle_diff_debug_num / self.lane_segment_debug_num}')
 
         # print(f'-------------------------------------------------')
         # random_idxs = get_random_ints(batch_size, 10)
@@ -298,9 +298,9 @@ class GRUDecoder(nn.Module):
 
         # obtain candidate lane encodings C = ConCat{c_{1:k}, s^_{1:k}}^{t_f}_{t=1}
         dense_lane_topk = torch.cat([dense_lane_topk, dense_lane_topk_scores.unsqueeze(-1)], dim=-1) # [N*H, mink, hidden_size + 1]
-        print(f'(2) dense_lane_topk.shape: {dense_lane_topk.shape}')
+        # print(f'(2) dense_lane_topk.shape: {dense_lane_topk.shape}')
         dense_lane_topk = dense_lane_topk.view(batch_size, future_frame_num*mink, self.hidden_size + 1) # [N, sense*mink, hidden_size + 1]
-        print(f'(3) dense_lane_topk.shape: {dense_lane_topk.shape}')
+        # print(f'(3) dense_lane_topk.shape: {dense_lane_topk.shape}')
         return dense_lane_topk # [N, H*mink, hidden_size + 1]
 
     def forward(self, mapping: List[Dict], batch_size, lane_states_batch, lane_states_length, inputs: Tensor,
