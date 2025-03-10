@@ -215,7 +215,7 @@ class GRUDecoder(nn.Module):
             if not torch.equal(topk_indices, valid_topk_indices):
                 for lane_idx in topk_indices:
                     if lane_idx not in valid_topk_indices:
-                        print(f'invalid lane index {lane_idx}, lane_meta[{lane_idx}]: {lane_meta[lane_idx]}')
+                        print(f'invalid, ego_angle_abs: {ego_angle_abs}, lane_meta[{lane_idx}]: {lane_meta[lane_idx]}')
                         self.invalid_lane_segment_in_topk_num += 1
 
             return valid_topk_indices
