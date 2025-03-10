@@ -267,11 +267,12 @@ class GRUDecoder(nn.Module):
             # if i < 3:
             #     print(f'dense_lane_pred[{i}]: {dense_lane_pred[i]}')
             #     print(f'sum: {torch.exp(dense_lane_pred[i]).sum()}')
-            self.lane_segment_num += topk_idxs.size(0)
             # _, topk_idxs = torch.topk(dense_lane_pred[i], k) # select top k=2 (or 4) lane segments to guide decoder
             topk_idxs = top_k_indices(dense_lane_pred[i], subdivided_lane_to_lane_meta[batch_idx], k)
             dense_lane_topk[i][:k] = lane_states_batch[batch_idx, topk_idxs] # [N*H, mink, hidden_size]
             dense_lane_topk_scores[i][:k] = dense_lane_pred[i][topk_idxs] # [N*H, mink]
+
+            self.lane_segment_num += topk_idxs.size(0)
 
             # topk_lane_meta = [subdivided_lane_to_lane_meta[batch_idx][index] for index in topk_idxs.tolist()]
             #
