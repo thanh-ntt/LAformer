@@ -214,7 +214,9 @@ class GRUDecoder(nn.Module):
             # print(f'valid_topk_indices: {valid_topk_indices}, sum(valid_topk_indices): {sum_valid_topk_indices}')
             if not torch.equal(topk_indices, valid_topk_indices):
                 print('invalid ---------------------------------------')
-                print(f'ego_angle_abs: {ego_angle_abs}')
+                instance_token = utils.get_from_mapping(mapping, 'file_name')[batch_idx]
+                sample_token = utils.get_from_mapping(mapping, 'sample_token')[batch_idx]
+                print(f'instance_token: {instance_token}, sample_token: {sample_token}, ego_angle_abs: {ego_angle_abs}')
                 for lane_idx in topk_indices:
                     if lane_idx not in valid_topk_indices:
                         lane_idx_in_topk_indices = torch.nonzero(topk_indices == lane_idx, as_tuple=True)[0].item()
