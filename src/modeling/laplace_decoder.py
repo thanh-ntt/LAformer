@@ -256,7 +256,7 @@ class GRUDecoder(nn.Module):
             dense_lane_topk_scores[i][:k] = dense_lane_pred[i][topk_idxs] # [N*H, mink]
 
             # TODO: verify this works
-            dense_lane_topk_lane_meta[i][:k] = subdivided_lane_to_lane_meta[i][topk_idxs]
+            dense_lane_topk_lane_meta[i][:k] = subdivided_lane_to_lane_meta[i][topk_idxs.tolist()]
 
         print(f'-------------------------------------------------')
         for idx in random_idxs:
