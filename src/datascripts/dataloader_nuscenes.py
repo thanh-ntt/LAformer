@@ -357,11 +357,11 @@ class NuScenesData(SingleAgentDataset):
         self.map = NuScenesMap(dataroot=self.args['dataroot'], map_name=self.location)
 
         # helper.get_sample_annotation always returns vehicle (`'vehicle' in ego_car_info['category_name']` always TRUE)
-        ego_car_info = self.helper.get_sample_annotation(sample_token=self.sample_token, instance_token=self.instance_token)
+        self.ego_car_info = self.helper.get_sample_annotation(sample_token=self.sample_token, instance_token=self.instance_token)
         # print('---------------------------------------------')
         # print(f'idx = {idx}, ego_car_info:')
         # pprint(ego_car_info)
-        self.cent_x, self.cent_y = ego_car_info['translation'][0], ego_car_info['translation'][1]  # global
+        self.cent_x, self.cent_y = self.ego_car_info['translation'][0], self.ego_car_info['translation'][1]  # global
         self.ego_past_traj_abs = self.helper.get_past_for_agent(self.instance_token, self.sample_token,
                                                        seconds=self.args['t_h'], in_agent_frame=False)[::-1]
         self.ego_future_traj_abs = self.helper.get_future_for_agent(self.instance_token, self.sample_token,
@@ -387,7 +387,7 @@ class NuScenesData(SingleAgentDataset):
             seconds=self.args['t_f'], in_agent_frame=False, just_xy=False
         )
         yaws = [quaternion_yaw(Quaternion(d['rotation'])) for d in tmp_past]
-        yaw = quaternion_yaw(Quaternion(ego_car_info['rotation']))
+        yaw = quaternion_yaw(Quaternion(self.ego_car_info['rotation']))
         yaws.extend([yaw])
         # yaws = [correct_yaw(yaw) for yaw in yaws]
         self.angle = - np.array(yaws).mean() + math.pi / 2 # TODO: why use negative '-' here??
@@ -580,6 +580,7 @@ class NuScenesData(SingleAgentDataset):
             scale=self.scale,
             eval_time=self.eval_frames,
 
+            ego_car_info=self.ego_car_info,
             angle=self.angle, # self.angle needs to be offset & negate: true_angle = - (self.angle - math.pi / 2)
             cent_x=self.cent_x,
             cent_y=self.cent_y,

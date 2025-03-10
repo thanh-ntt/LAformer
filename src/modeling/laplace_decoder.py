@@ -110,8 +110,6 @@ class GRUDecoder(nn.Module):
 
         self.lane_segment_num = 0
         self.angle_diff_num = 0
-        self.lane_segment_debug_num = 0
-        self.angle_diff_debug_num = 0
 
     def dense_lane_aware(self, i, mapping: List[Dict], lane_states_batch, lane_states_length, element_hidden_states, \
                             element_hidden_states_lengths, global_hidden_states, device, loss):
@@ -193,13 +191,23 @@ class GRUDecoder(nn.Module):
             # print(f'(2) dense_lane_scores.shape: {dense_lane_scores.shape}')
             return dense_lane_scores # [seq_len, batch, future_steps] = [max_len, N, H]
 
-        def check_rules_lane_segments():
-            # TODO: return list of indices of lane segments that violate 1 or many rules
-            # Try this with topk lane segments first
-            pass
-        def check_nearby_lane_segments():
-            # TODO: check if any of the input lane segments are under nearby_lane_segment_threshold
-            pass
+        def top_k_indices(pred_score, lane_meta, k) -> Tensor:
+            assert pred_score.shape[0] == lane_meta.shape[0]
+            filtered_pred_score = torch.tensor(pred_score, device=device)
+            ego_angle_abs = utils.get_from_mapping(mapping, 'angle')[batch_idx]
+            for lane_idx in range(0, pred_score.shape[0]):
+                lane_angle, _, layer = lane_meta[lane_idx]
+                if layer == 'lane' and compute_angle_diff(lane_angle, ego_angle_abs) > (math.pi * 4 / 5):
+                    filtered_pred_score[lane_idx] *= 2 # penalty is *2 (score is log of prob - always negative))
+                    self.angle_diff_num += 1
+            _, filtered_topk_indices = torch.topk(filtered_pred_score, k)
+            if not torch.equal(pred_score, filtered_pred_score):
+                _, topk_indices = torch.topk(pred_score, k)
+                filtered_indices = ~torch.isin(topk_indices, filtered_topk_indices)
+                print(f'lane_meta[filtered_indices]: {lane_meta[filtered_indices]}')
+
+            return filtered_topk_indices
+
         max_vector_num = lane_states_batch.shape[1]
         batch_size = len(mapping)
         # print(f'batch_size: {batch_size}')
@@ -212,7 +220,7 @@ class GRUDecoder(nn.Module):
         src_attention_mask_lane = src_attention_mask_lane == 0
         lane_states_batch = lane_states_batch.permute(1, 0, 2) # [max_len, N, feature]
         # print(f'lane_states_batch.shape: {lane_states_batch.shape}')
-        dense_lane_pred = compute_dense_lane_scores() # [max_len, N, H]
+        dense_lane_pred = compute_dense_lane_scores() # [max_len, N, H] - log(true_pred_score)
         # print(f'(1) dense_lane_pred.shape: {dense_lane_pred.shape}')
         dense_lane_pred = dense_lane_pred.permute(1, 0, 2) # [N, max_len, H]
         # print(f'(2) dense_lane_pred.shape: {dense_lane_pred.shape}')
@@ -260,29 +268,23 @@ class GRUDecoder(nn.Module):
                 print(f'dense_lane_pred[{i}]: {dense_lane_pred[i]}')
                 print(f'sum: {torch.exp(dense_lane_pred[i]).sum()}')
             _, topk_idxs = torch.topk(dense_lane_pred[i], k) # select top k=2 (or 4) lane segments to guide decoder
+            # topk_idxs = top_k_indices(dense_lane_pred[i], subdivided_lane_to_lane_meta[batch_idx], k)
             dense_lane_topk[i][:k] = lane_states_batch[batch_idx, topk_idxs] # [N*H, mink, hidden_size]
             dense_lane_topk_scores[i][:k] = dense_lane_pred[i][topk_idxs] # [N*H, mink]
 
-            _, debug_topk_idxs = torch.topk(dense_lane_pred[i], debug_topk)
-
             topk_lane_meta = [subdivided_lane_to_lane_meta[batch_idx][index] for index in topk_idxs.tolist()]
-            topk_debug_lane_meta = [subdivided_lane_to_lane_meta[batch_idx][index] for index in debug_topk_idxs.tolist()]
 
             self.lane_segment_num += topk_idxs.size(0)
-            self.lane_segment_debug_num += debug_topk_idxs.size(0)
             ego_angle_abs = utils.get_from_mapping(mapping, 'angle')[batch_idx]
             for j, _ in enumerate(topk_idxs.tolist()):
                 lane_angle, _, layer = topk_lane_meta[j]
                 if layer == 'lane_connector':
                     continue
                 if compute_angle_diff(lane_angle, ego_angle_abs) > (math.pi * 4 / 5):
+                    print(f'topk_lane_meta[j]: {topk_lane_meta[j]}, ego_angle_abs: {ego_angle_abs}')
+                    ego_car_info = utils.get_from_mapping(mapping, 'ego_car_info')[batch_idx]
+                    print(f'ego_car_info: {ego_car_info}')
                     self.angle_diff_num += 1
-            for j, _ in enumerate(debug_topk_idxs.tolist()):
-                lane_angle, _, layer = topk_debug_lane_meta[j]
-                if layer == 'lane_connector':
-                    continue
-                if compute_angle_diff(lane_angle, ego_angle_abs) > (math.pi * 4 / 5):
-                    self.angle_diff_debug_num += 1
 
         print(f'lane_segment_num: {self.lane_segment_num}, angle_diff_num: {self.angle_diff_num}, % = {self.angle_diff_num / self.lane_segment_num}')
         print(f'lane_segment_debug_num: {self.lane_segment_debug_num}, angle_diff_debug_num: {self.angle_diff_debug_num}, % = {self.angle_diff_debug_num / self.lane_segment_debug_num}')
