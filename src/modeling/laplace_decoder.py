@@ -197,7 +197,7 @@ class GRUDecoder(nn.Module):
             ego_angle_abs = - (utils.get_from_mapping(mapping, 'angle')[batch_idx] - math.pi / 2)
             for lane_idx in range(0, pred_score.shape[0]):
                 lane_angle, _, layer = lane_meta[lane_idx]
-                if layer == 'lane' and compute_angle_diff(lane_angle, ego_angle_abs) > (math.pi * 4 / 5):
+                if layer == 'lane' and compute_angle_diff(lane_angle, ego_angle_abs) > (math.pi * 2 / 3):
                     filtered_pred_score[lane_idx] *= 2 # penalty is *2 (score is log of prob - always negative))
                     self.angle_diff_num += 1
             _, filtered_topk_indices = torch.topk(filtered_pred_score, k)
@@ -280,7 +280,7 @@ class GRUDecoder(nn.Module):
                 lane_angle, _, layer = topk_lane_meta[j]
                 if layer == 'lane_connector':
                     continue
-                if compute_angle_diff(lane_angle, ego_angle_abs) > (math.pi * 4 / 5):
+                if compute_angle_diff(lane_angle, ego_angle_abs) > (math.pi * 2 / 3):
                     print(f'topk_lane_meta[j]: {topk_lane_meta[j]}, ego_angle_abs: {ego_angle_abs}')
                     ego_car_info = utils.get_from_mapping(mapping, 'ego_car_info')[batch_idx]
                     print(f'ego_car_info: {ego_car_info}')
