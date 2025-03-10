@@ -702,13 +702,22 @@ class NuScenesData(SingleAgentDataset):
         bound = self.subdivide_len
         # print(length)
         while True:
+            if length - left_index <= 1:
+                break
+
+            lane_token =  self.valid_lane_traj_tokens[l_id]
+            layer = 'lane'
+            try:
+                self.map.get('lane', lane_token)
+            except KeyError:
+                layer = 'lane_connector'
+            # append [lane_token, layer] to self.valid_lanes_midline_abs[l_id][0][2] and return the new ndarray
+            lane_meta = ndarray[float(self.valid_lanes_midline_abs[l_id][0][2]), lane_token, layer]
+            self.subdivided_lane_to_lane_meta.append(lane_meta)
+
             if length - left_index >= bound:
                 self.subdivided_lane_traj_rel.append(lane_poses[left_index:left_index + bound])
                 self.subdivided_lane_to_idx2.append(l_id)
-
-                # TODO: refactor to 1 call (1 call below)
-                lane_midline_abs = np.append(self.valid_lanes_midline_abs[l_id][0][2], self.valid_lane_traj_tokens[l_id])
-                self.subdivided_lane_to_lane_meta.append(lane_midline_abs)
 
                 if len(self.subdivided_lane_to_idx2) == 1 or \
                         self.subdivided_lane_to_idx2[-1] != self.subdivided_lane_to_idx2[
@@ -723,10 +732,6 @@ class NuScenesData(SingleAgentDataset):
                 self.subdivided_lane_traj_rel.append(lane_poses[left_index:])
                 self.subdivided_lane_to_idx2.append(l_id)
 
-                # TODO: refactor to 1 call (1 call above)
-                lane_midline_abs = np.append(self.valid_lanes_midline_abs[l_id][0][2], self.valid_lane_traj_tokens[l_id])
-                self.subdivided_lane_to_lane_meta.append(lane_midline_abs)
-
                 if len(self.subdivided_lane_to_idx2) == 1 or \
                         self.subdivided_lane_to_idx2[-1] != self.subdivided_lane_to_idx2[
                     -2]:
@@ -734,8 +739,6 @@ class NuScenesData(SingleAgentDataset):
                 else:
                     self.rel_ind_2_abs_ind_offset.append(
                         self.rel_ind_2_abs_ind_offset[-1] + len(self.subdivided_lane_traj_rel[-2]))
-                break
-            else:
                 break
         return 0
 
