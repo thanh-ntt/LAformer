@@ -264,27 +264,27 @@ class GRUDecoder(nn.Module):
         for i in range(dense_lane_topk_scores.shape[0]): # for each i in N*H (batch_size * future_frame_num)
             batch_idx = i // future_frame_num
             k = min(mink, lane_states_length[batch_idx])
-            if i < 3:
-                print(f'dense_lane_pred[{i}]: {dense_lane_pred[i]}')
-                print(f'sum: {torch.exp(dense_lane_pred[i]).sum()}')
-            _, topk_idxs = torch.topk(dense_lane_pred[i], k) # select top k=2 (or 4) lane segments to guide decoder
-            # topk_idxs = top_k_indices(dense_lane_pred[i], subdivided_lane_to_lane_meta[batch_idx], k)
+            # if i < 3:
+            #     print(f'dense_lane_pred[{i}]: {dense_lane_pred[i]}')
+            #     print(f'sum: {torch.exp(dense_lane_pred[i]).sum()}')
+            self.lane_segment_num += topk_idxs.size(0)
+            # _, topk_idxs = torch.topk(dense_lane_pred[i], k) # select top k=2 (or 4) lane segments to guide decoder
+            topk_idxs = top_k_indices(dense_lane_pred[i], subdivided_lane_to_lane_meta[batch_idx], k)
             dense_lane_topk[i][:k] = lane_states_batch[batch_idx, topk_idxs] # [N*H, mink, hidden_size]
             dense_lane_topk_scores[i][:k] = dense_lane_pred[i][topk_idxs] # [N*H, mink]
 
-            topk_lane_meta = [subdivided_lane_to_lane_meta[batch_idx][index] for index in topk_idxs.tolist()]
-
-            self.lane_segment_num += topk_idxs.size(0)
-            ego_angle_abs = - (utils.get_from_mapping(mapping, 'angle')[batch_idx] - math.pi / 2)
-            for j, _ in enumerate(topk_idxs.tolist()):
-                lane_angle, _, layer = topk_lane_meta[j]
-                if layer == 'lane_connector':
-                    continue
-                if compute_angle_diff(lane_angle, ego_angle_abs) > (math.pi * 2 / 3):
-                    print(f'topk_lane_meta[j]: {topk_lane_meta[j]}, ego_angle_abs: {ego_angle_abs}')
-                    ego_car_info = utils.get_from_mapping(mapping, 'ego_car_info')[batch_idx]
-                    print(f'ego_car_info: {ego_car_info}')
-                    self.angle_diff_num += 1
+            # topk_lane_meta = [subdivided_lane_to_lane_meta[batch_idx][index] for index in topk_idxs.tolist()]
+            #
+            # ego_angle_abs = - (utils.get_from_mapping(mapping, 'angle')[batch_idx] - math.pi / 2)
+            # for j, _ in enumerate(topk_idxs.tolist()):
+            #     lane_angle, _, layer = topk_lane_meta[j]
+            #     if layer == 'lane_connector':
+            #         continue
+            #     if compute_angle_diff(lane_angle, ego_angle_abs) > (math.pi * 2 / 3):
+            #         print(f'topk_lane_meta[j]: {topk_lane_meta[j]}, ego_angle_abs: {ego_angle_abs}')
+            #         ego_car_info = utils.get_from_mapping(mapping, 'ego_car_info')[batch_idx]
+            #         print(f'ego_car_info: {ego_car_info}')
+            #         self.angle_diff_num += 1
 
         print(f'lane_segment_num: {self.lane_segment_num}, angle_diff_num: {self.angle_diff_num}, % = {self.angle_diff_num / self.lane_segment_num}')
 
