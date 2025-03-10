@@ -951,4 +951,7 @@ def init_weights(m: nn.Module) -> None:
             elif 'bias_hh' in name:
                 nn.init.zeros_(param)
 
+def get_random_ints(batch_size: int, num_ints: int) -> List[int]:
+    # this is deterministic as `random.seed(args.seed)`  has been invoked before
+    return [random.randint(0, batch_size - 1) for _ in range(num_ints)]
 

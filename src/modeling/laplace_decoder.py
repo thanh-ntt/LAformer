@@ -10,7 +10,7 @@ from torch import nn, Tensor
 from typing import Dict, List, Tuple, NamedTuple, Any
 import numpy as np
 from utils_files import utils, config
-from utils_files.utils import init_weights
+from utils_files.utils import init_weights, get_random_ints
 from modeling.vectornet import *
 from modeling.motion_refinement import trajectory_refinement
 from utils_files.loss import *
@@ -243,13 +243,28 @@ class GRUDecoder(nn.Module):
         print(f'(1) dense_lane_topk.shape: {dense_lane_topk.shape}')
         dense_lane_topk_scores = torch.zeros((dense_lane_pred.shape[0], mink), device=device)   # [N*H, mink]
         print(f'dense_lane_topk_scores.shape: {dense_lane_topk_scores.shape}')
-        # dense_lane_pred = dense_lane_pred.exp()
+
+        dense_lane_topk_lane_meta = torch.zeros((dense_lane_pred.shape[0], mink, 2), device=device)
+        subdivided_lane_to_lane_meta = utils.get_from_mapping(mapping, 'subdivided_lane_to_lane_meta')
+        random_idxs = get_random_ints(batch_size, 10)
+
         for i in range(dense_lane_topk_scores.shape[0]): # for each i in N*H (batch_size * future_frame_num)
-            idxs_lane = i // future_frame_num
-            k = min(mink, lane_states_length[idxs_lane])
-            _, idxs_topk = torch.topk(dense_lane_pred[i], k) # select top k=2 (or 4) lane segments to guide decoder
-            dense_lane_topk[i][:k] = lane_states_batch[idxs_lane, idxs_topk] # [N*H, mink, hidden_size]
-            dense_lane_topk_scores[i][:k] = dense_lane_pred[i][idxs_topk] # [N*H, mink]
+            batch_idx = i // future_frame_num
+            k = min(mink, lane_states_length[batch_idx])
+            _, topk_idxs = torch.topk(dense_lane_pred[i], k) # select top k=2 (or 4) lane segments to guide decoder
+            dense_lane_topk[i][:k] = lane_states_batch[batch_idx, topk_idxs] # [N*H, mink, hidden_size]
+            dense_lane_topk_scores[i][:k] = dense_lane_pred[i][topk_idxs] # [N*H, mink]
+
+            # TODO: verify this works
+            dense_lane_topk_lane_meta[i][:k] = subdivided_lane_to_lane_meta[i][topk_idxs]
+
+        print(f'-------------------------------------------------')
+        for idx in random_idxs:
+            print(f'random idx = {idx}::')
+            for idx2 in range(idx * future_frame_num, (idx + 1) * future_frame_num):
+                print(f'    dense_lane_topk_scores: {dense_lane_topk_scores[idx2][:mink]}')
+                print(f'    subdivided_lane_to_lane_meta: {subdivided_lane_to_lane_meta[idx2][:mink]}')
+        print(f'-------------------------------------------------')
 
         # obtain candidate lane encodings C = ConCat{c_{1:k}, s^_{1:k}}^{t_f}_{t=1}
         dense_lane_topk = torch.cat([dense_lane_topk, dense_lane_topk_scores.unsqueeze(-1)], dim=-1) # [N*H, mink, hidden_size + 1]
