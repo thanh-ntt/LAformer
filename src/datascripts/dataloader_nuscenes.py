@@ -274,7 +274,6 @@ class NuScenesData(SingleAgentDataset):
         self.stepwise_label = np.zeros((self.eval_frames))
         self.vectors = []
         self.polyline_spans = []
-        self.matrix = []
         self.mapping = {}
 
     def get_mapping(self, idx: int) -> Dict:
@@ -444,9 +443,9 @@ class NuScenesData(SingleAgentDataset):
         self.compute_lane_attributes()
 
         self.subdivide_lanes()
-        total_length = sum(len(lane) for lane in self.valid_lanes_midline_rel)
-        print(f'total length (# lane poses) of all lanes in self.valid_lanes_midline_rel: {total_length}')
-        print(f'len(self.subdivided_lane_traj_rel): {len(self.subdivided_lane_traj_rel)}')
+        # total_length = sum(len(lane) for lane in self.valid_lanes_midline_rel)
+        # print(f'total length (# lane poses) of all lanes in self.valid_lanes_midline_rel: {total_length}')
+        # print(f'len(self.subdivided_lane_traj_rel): {len(self.subdivided_lane_traj_rel)}')
 
         # encode subdivided polygons
         for i_polygon, polygon in enumerate(self.subdivided_lane_traj_rel):
@@ -486,14 +485,12 @@ class NuScenesData(SingleAgentDataset):
                     point_pre_pre = polygon[i_point - 2]
                 vector[-17] = point_pre_pre[0]
                 vector[-18] = point_pre_pre[1]
-                # TODO: add lane heading direction to vector[-19]
                 self.vectors.append(vector)
             end = len(self.vectors)
             if start < end:
                 self.polyline_spans.append([start, end])
         if len(self.polyline_spans) == self.map_start_polyline_idx:
             self.mapping = None # TODO: why do we even do this?
-        self.matrix = np.array(self.vectors) # self.matrix seems like un-used variable. TODO: refactor (remove self.matrix)
         return 0
 
     def encode_agents(self, idx: int) -> int:
@@ -756,10 +753,6 @@ class NuScenesData(SingleAgentDataset):
         for lane_idx, lane_poses in enumerate(self.valid_lanes_midline_rel):
             if len(lane_poses) <= 1:
                 continue
-            # print(lane_idx)
-            if lane_idx == 0:
-                print(f'lane_idx = {lane_idx}, lane_poses[:10]: {lane_poses[:10]}')
-                print(f'self.valid_lane_traj_tokens[{lane_idx}]: {self.valid_lane_traj_tokens[lane_idx]}')
             self.divide_single_lane(lane_poses, lane_idx)
 
         self.subdivided_lane_traj_rel = np.array(self.subdivided_lane_traj_rel, dtype=object)
@@ -815,6 +808,7 @@ class NuScenesData(SingleAgentDataset):
         # print(f'self.lanes_midlines_abs[0]: {self.lanes_midline_abs[0]}')
         # print(f'self.angle: {self.angle}')
         # Rotate lanes to relative coordinate
+        # TODO: change this into a nice filter/mapping call
         for lane_idx, lane_midline_abs in enumerate(self.lanes_midline_abs):
             # rotate to get the relative (rel) coordinate from absolute (abs) coordinate
             # This conversion is necessary as get_lanes_in_radius
