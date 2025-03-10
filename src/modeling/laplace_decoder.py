@@ -194,7 +194,7 @@ class GRUDecoder(nn.Module):
         def top_k_indices(pred_score, lane_meta, k) -> Tensor:
             assert pred_score.shape[0] == lane_meta.shape[0]
             filtered_pred_score = torch.tensor(pred_score, device=device)
-            ego_angle_abs = utils.get_from_mapping(mapping, 'angle')[batch_idx]
+            ego_angle_abs = - (utils.get_from_mapping(mapping, 'angle')[batch_idx] - math.pi / 2)
             for lane_idx in range(0, pred_score.shape[0]):
                 lane_angle, _, layer = lane_meta[lane_idx]
                 if layer == 'lane' and compute_angle_diff(lane_angle, ego_angle_abs) > (math.pi * 4 / 5):
@@ -275,7 +275,7 @@ class GRUDecoder(nn.Module):
             topk_lane_meta = [subdivided_lane_to_lane_meta[batch_idx][index] for index in topk_idxs.tolist()]
 
             self.lane_segment_num += topk_idxs.size(0)
-            ego_angle_abs = utils.get_from_mapping(mapping, 'angle')[batch_idx]
+            ego_angle_abs = - (utils.get_from_mapping(mapping, 'angle')[batch_idx] - math.pi / 2)
             for j, _ in enumerate(topk_idxs.tolist()):
                 lane_angle, _, layer = topk_lane_meta[j]
                 if layer == 'lane_connector':
@@ -287,7 +287,6 @@ class GRUDecoder(nn.Module):
                     self.angle_diff_num += 1
 
         print(f'lane_segment_num: {self.lane_segment_num}, angle_diff_num: {self.angle_diff_num}, % = {self.angle_diff_num / self.lane_segment_num}')
-        print(f'lane_segment_debug_num: {self.lane_segment_debug_num}, angle_diff_debug_num: {self.angle_diff_debug_num}, % = {self.angle_diff_debug_num / self.lane_segment_debug_num}')
 
         # print(f'-------------------------------------------------')
         # random_idxs = get_random_ints(batch_size, 10)
