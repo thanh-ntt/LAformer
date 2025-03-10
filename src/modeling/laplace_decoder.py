@@ -270,11 +270,11 @@ class GRUDecoder(nn.Module):
             ego_angle_abs = utils.get_from_mapping(mapping, 'angle')[batch_idx]
             for j, _ in enumerate(topk_idxs.tolist()):
                 lane_angle = topk_lane_meta[j][0]
-                if compute_angle_diff(lane_angle, ego_angle_abs) > (math.pi * 2 / 3):
+                if compute_angle_diff(lane_angle, ego_angle_abs) > (math.pi * 3 / 4):
                     self.angle_diff_num += 1
             for j, _ in enumerate(debug_topk_idxs.tolist()):
                 lane_angle = topk_debug_lane_meta[j][0]
-                if compute_angle_diff(lane_angle, ego_angle_abs) > (math.pi * 2 / 3):
+                if compute_angle_diff(lane_angle, ego_angle_abs) > (math.pi * 3 / 4):
                     self.angle_diff_debug_num += 1
 
         print(f'lane_segment_num: {self.lane_segment_num}, angle_diff_num: {self.angle_diff_num}')

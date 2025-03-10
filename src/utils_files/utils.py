@@ -963,4 +963,5 @@ def compute_angle_diff(angle_1, angle_2) -> float:
     diff = angle_1 - angle_2
     if diff > math.pi:
         diff = 2 * math.pi - diff
+    assert 0.0 <= diff <= math.pi
     return diff
