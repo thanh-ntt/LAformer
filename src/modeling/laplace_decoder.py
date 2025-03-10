@@ -1,6 +1,7 @@
 # LAfromer: https://arxiv.org/pdf/2302.13933.pdf
 # Written by Mengmeng Liu 
 # All Rights Reserved
+import math
 from pprint import pprint
 from typing import Tuple
 import torch
@@ -248,6 +249,7 @@ class GRUDecoder(nn.Module):
         subdivided_lane_to_lane_meta = utils.get_from_mapping(mapping, 'subdivided_lane_to_lane_meta')
         random_idxs = get_random_ints(batch_size, 10)
 
+        debug_topk = 5
         for i in range(dense_lane_topk_scores.shape[0]): # for each i in N*H (batch_size * future_frame_num)
             batch_idx = i // future_frame_num
             k = min(mink, lane_states_length[batch_idx])
@@ -255,19 +257,17 @@ class GRUDecoder(nn.Module):
             dense_lane_topk[i][:k] = lane_states_batch[batch_idx, topk_idxs] # [N*H, mink, hidden_size]
             dense_lane_topk_scores[i][:k] = dense_lane_pred[i][topk_idxs] # [N*H, mink]
 
-            # TODO: verify this works
-            print(f'topk_idxs.tolist(): {topk_idxs.tolist()}')
-            print(f'len(subdivided_lane_to_lane_meta[{batch_idx}]): {len(subdivided_lane_to_lane_meta[batch_idx])}')
+            debug_topk_idxs = torch.topk(dense_lane_pred[i], debug_topk)
             dense_lane_topk_lane_meta.append(
-                [subdivided_lane_to_lane_meta[batch_idx][index] for index in topk_idxs.tolist()]
+                [subdivided_lane_to_lane_meta[batch_idx][index] for index in debug_topk_idxs.tolist()]
             )
 
         print(f'-------------------------------------------------')
         for idx in random_idxs:
-            print(f'random batch idx = {idx}::')
+            print(f'random batch idx = {idx}, debug_topk: {debug_topk}')
             for idx2 in range(idx * future_frame_num, (idx + 1) * future_frame_num):
-                print(f'    dense_lane_topk_scores: {dense_lane_topk_scores[idx2][:mink]}')
-                print(f'    dense_lane_topk_lane_meta: {dense_lane_topk_lane_meta[idx2][:mink]}')
+                print(f'    dense_lane_top{debug_topk}_scores: {dense_lane_topk_scores[idx2][:debug_topk]}')
+                print(f'    dense_lane_top{debug_topk}_lane_meta: {dense_lane_topk_lane_meta[idx2][:debug_topk]}')
         print(f'-------------------------------------------------')
 
         # obtain candidate lane encodings C = ConCat{c_{1:k}, s^_{1:k}}^{t_f}_{t=1}
@@ -318,6 +318,13 @@ class GRUDecoder(nn.Module):
             global_embed: hidden states of agents after encoding by global graph
                 [batch_size, hidden_size]
         """
+        instance_token = utils.get_from_mapping(mapping, 'file_name')
+        sample_token = utils.get_from_mapping(mapping, 'sample_token')
+        city_name = utils.get_from_mapping(mapping, 'city_name')
+        angle = utils.get_from_mapping(mapping, 'angle')
+        print(f'instance_token: {instance_token}\nsample_token: {sample_token}\n'
+              f'city_name: {city_name}\nangle: {angle}\nactual angle: {- (self.angle - math.pi / 2)}')
+
         labels = utils.get_from_mapping(mapping, 'labels')
         labels_is_valid = utils.get_from_mapping(mapping, 'labels_is_valid')
         loss = torch.zeros(batch_size, device=device)
