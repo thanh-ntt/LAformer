@@ -193,7 +193,7 @@ class GRUDecoder(nn.Module):
 
         def top_k_indices(pred_score, lane_meta, k) -> Tensor:
             print(f'pred_score.shape: {pred_score.shape}')
-            print(f'lane_meta.shape: {lane_meta.shape}')
+            print(f'len(lane_meta): {len(lane_meta)}')
             assert pred_score.shape[0] == lane_meta.shape[0]
             filtered_pred_score = torch.tensor(pred_score, device=device)
             ego_angle_abs = - (utils.get_from_mapping(mapping, 'angle')[batch_idx] - math.pi / 2)
