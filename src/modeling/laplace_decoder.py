@@ -194,21 +194,23 @@ class GRUDecoder(nn.Module):
         def top_k_indices(pred_score, lane_meta, k) -> Tensor:
             print(f'pred_score.shape: {pred_score.shape}')
             print(f'len(lane_meta): {len(lane_meta)}')
-            assert pred_score.shape[0] == lane_meta.shape[0]
-            filtered_pred_score = torch.tensor(pred_score, device=device)
+            # assert pred_score.shape[0] == len(lane_meta)
+            pred_score_processed = torch.tensor(pred_score, device=device)
             ego_angle_abs = - (utils.get_from_mapping(mapping, 'angle')[batch_idx] - math.pi / 2)
             for lane_idx in range(0, pred_score.shape[0]):
                 lane_angle, _, layer = lane_meta[lane_idx]
                 if layer == 'lane' and compute_angle_diff(lane_angle, ego_angle_abs) > (math.pi * 2 / 3):
-                    filtered_pred_score[lane_idx] *= 2 # penalty is *2 (score is log of prob - always negative))
+                    pred_score_processed[lane_idx] *= 2 # penalty is *2 (score is log of prob - always negative))
                     self.angle_diff_num += 1
-            _, filtered_topk_indices = torch.topk(filtered_pred_score, k)
-            if not torch.equal(pred_score, filtered_pred_score):
-                _, topk_indices = torch.topk(pred_score, k)
-                filtered_indices = ~torch.isin(topk_indices, filtered_topk_indices)
+            _, topk_indices = torch.topk(pred_score, k)
+            _, valid_topk_indices = torch.topk(pred_score_processed, k)
+            print(f'topk_indices: {topk_indices}')
+            print(f'valid_topk_indices: {valid_topk_indices}')
+            if not torch.equal(pred_score, pred_score_processed):
+                filtered_indices = ~torch.isin(topk_indices, valid_topk_indices)
                 print(f'lane_meta[filtered_indices]: {lane_meta[filtered_indices]}')
 
-            return filtered_topk_indices
+            return valid_topk_indices
 
         max_vector_num = lane_states_batch.shape[1]
         batch_size = len(mapping)
