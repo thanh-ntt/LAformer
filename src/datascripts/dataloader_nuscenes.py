@@ -712,7 +712,7 @@ class NuScenesData(SingleAgentDataset):
             except KeyError:
                 layer = 'lane_connector'
             # append [lane_token, layer] to self.valid_lanes_midline_abs[l_id][0][2] and return the new ndarray
-            lane_meta = ndarray[float(self.valid_lanes_midline_abs[l_id][0][2]), lane_token, layer]
+            lane_meta = np.append(self.valid_lanes_midline_abs[l_id][0][2], [lane_token, layer])
             self.subdivided_lane_to_lane_meta.append(lane_meta)
 
             if length - left_index >= bound:
