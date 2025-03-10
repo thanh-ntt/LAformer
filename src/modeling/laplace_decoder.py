@@ -257,7 +257,7 @@ class GRUDecoder(nn.Module):
             dense_lane_topk[i][:k] = lane_states_batch[batch_idx, topk_idxs] # [N*H, mink, hidden_size]
             dense_lane_topk_scores[i][:k] = dense_lane_pred[i][topk_idxs] # [N*H, mink]
 
-            debug_topk_idxs = torch.topk(dense_lane_pred[i], debug_topk)
+            _, debug_topk_idxs = torch.topk(dense_lane_pred[i], debug_topk)
             dense_lane_topk_lane_meta.append(
                 [subdivided_lane_to_lane_meta[batch_idx][index] for index in debug_topk_idxs.tolist()]
             )
