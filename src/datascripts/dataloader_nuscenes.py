@@ -17,6 +17,7 @@ import os
 import sys
 
 from numpy import ndarray
+from sympy.strategies.core import switch
 from torch import dtype
 
 root_path = os.path.abspath(__file__)
@@ -1042,12 +1043,14 @@ class NuScenesData(SingleAgentDataset):
         print("length of ex list: ", len(ex_list))
         if not self.args['img_only']:
             os.makedirs(self.data_dir, exist_ok=True)
-            if 'train' in self.args['split']:
+            if self.args['split'] in ['mini_train', 'train']:
                 with open(os.path.join(self.data_dir, 'ex_list'), 'wb') as f:
                     pickle.dump(ex_list, f)
-            elif 'val' in self.args['split']:
+            elif self.args['split'] in ['mini_val', 'train_val', 'val']:
                 with open(os.path.join(self.data_dir, 'eval.ex_list'), 'wb') as f:
                     pickle.dump(ex_list, f)
+            else:
+                raise ValueError("split must be one of (mini_train, mini_val, train, train_val, val)")
         print("dump finished!")
 
 def get_parser():
