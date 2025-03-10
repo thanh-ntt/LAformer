@@ -202,7 +202,7 @@ class GRUDecoder(nn.Module):
             for lane_idx in range(0, len(lane_meta)):
                 lane_angle, _, layer = lane_meta[lane_idx]
                 # if layer == 'lane' and compute_angle_diff(lane_angle, ego_angle_abs) > (math.pi * 4 / 5):
-                if compute_angle_diff(lane_angle, ego_angle_abs) > (math.pi * 2 / 3):
+                if compute_angle_diff(lane_angle, ego_angle_abs) > (math.pi * 3 / 4):
                     invalid_lane_indices.append(lane_idx)
                     pred_score_processed[lane_idx] = - math.inf
 
@@ -213,10 +213,9 @@ class GRUDecoder(nn.Module):
             # print(f'topk_indices: {topk_indices}, sum(topk_indices): {sum_topk_indices}')
             # print(f'valid_topk_indices: {valid_topk_indices}, sum(valid_topk_indices): {sum_valid_topk_indices}')
             if not torch.equal(topk_indices, valid_topk_indices):
-                mask = ~torch.isin(topk_indices, valid_topk_indices)
-                print(f'mask: {mask}')
-                self.angle_diff_num += mask.sum()
-                print(f'lane_meta[mask]: {[lane_meta[i] for i in mask.tolist()]}')
+                for lane_idx in topk_indices:
+                    if lane_idx not in valid_topk_indices:
+                        print(f'invalid lane index {lane_idx}, lane_meta[{lane_idx}]: {lane_meta[lane_idx]}')
 
             return valid_topk_indices
 
@@ -272,7 +271,6 @@ class GRUDecoder(nn.Module):
 
         subdivided_lane_to_lane_meta = utils.get_from_mapping(mapping, 'subdivided_lane_to_lane_meta')
 
-        debug_topk = 5
         for i in range(dense_lane_topk_scores.shape[0]): # for each i in N*H (batch_size * future_frame_num)
             batch_idx = i // future_frame_num
             k = min(mink, lane_states_length[batch_idx])
