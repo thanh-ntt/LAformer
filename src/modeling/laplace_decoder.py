@@ -277,7 +277,7 @@ class GRUDecoder(nn.Module):
                 if compute_angle_diff(lane_angle, ego_angle_abs) > (math.pi * 4 / 5):
                     self.angle_diff_debug_num += 1
 
-        print(f'lane_segment_num: {self.lane_segment_num}, angle_diff_num: {self.angle_diff_num}, % = {self.angle_diff_debug_num / self.lane_segment_num}')
+        print(f'lane_segment_num: {self.lane_segment_num}, angle_diff_num: {self.angle_diff_num}, % = {self.angle_diff_num / self.lane_segment_num}')
         print(f'lane_segment_debug_num: {self.lane_segment_debug_num}, angle_diff_debug_num: {self.angle_diff_debug_num}, % = {self.angle_diff_debug_num / self.lane_segment_debug_num}')
 
         # print(f'-------------------------------------------------')
