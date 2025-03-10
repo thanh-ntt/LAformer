@@ -17,8 +17,6 @@ import os
 import sys
 
 from numpy import ndarray
-from sympy.strategies.core import switch
-from torch import dtype
 
 root_path = os.path.abspath(__file__)
 root_path = '/'.join(root_path.split('/')[:-2])
