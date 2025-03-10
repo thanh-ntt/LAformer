@@ -192,8 +192,8 @@ class GRUDecoder(nn.Module):
             return dense_lane_scores # [seq_len, batch, future_steps] = [max_len, N, H]
 
         def top_k_indices(pred_score, lane_meta, k) -> Tensor:
-            print(f'pred_score.shape: {pred_score.shape}')
-            print(f'len(lane_meta): {len(lane_meta)}')
+            # print(f'pred_score.shape: {pred_score.shape}')
+            # print(f'len(lane_meta): {len(lane_meta)}')
             # assert pred_score.shape[0] == len(lane_meta)
             pred_score_processed = torch.tensor(pred_score, device=device)
             ego_angle_abs = - (utils.get_from_mapping(mapping, 'angle')[batch_idx] - math.pi / 2)
@@ -201,7 +201,7 @@ class GRUDecoder(nn.Module):
             invalid_lane_indices = []
             for lane_idx in range(0, len(lane_meta)):
                 lane_angle, _, layer = lane_meta[lane_idx]
-                if layer == 'lane' and compute_angle_diff(lane_angle, ego_angle_abs) > (math.pi * 2 / 3):
+                if layer == 'lane' and compute_angle_diff(lane_angle, ego_angle_abs) > (math.pi * 1 / 2):
                     invalid_lane_indices.append(lane_idx)
                     pred_score_processed[lane_idx] *= 2 # penalty is *2 (score is log of prob - always negative))
 
@@ -209,13 +209,13 @@ class GRUDecoder(nn.Module):
             _, valid_topk_indices = torch.topk(pred_score_processed, k)
             sum_topk_indices = torch.exp(pred_score[topk_indices]).sum()
             sum_valid_topk_indices = torch.exp(pred_score_processed[valid_topk_indices]).sum()
-            print(f'topk_indices: {topk_indices}, sum(topk_indices): {sum_topk_indices}')
-            print(f'valid_topk_indices: {valid_topk_indices}, sum(valid_topk_indices): {sum_valid_topk_indices}')
+            # print(f'topk_indices: {topk_indices}, sum(topk_indices): {sum_topk_indices}')
+            # print(f'valid_topk_indices: {valid_topk_indices}, sum(valid_topk_indices): {sum_valid_topk_indices}')
             if not torch.equal(pred_score, pred_score_processed):
                 mask = ~torch.isin(topk_indices, valid_topk_indices)
-                print(f'mask: {mask}')
+                # print(f'mask: {mask}')
                 self.angle_diff_num += mask.sum()
-                print(f'lane_meta[mask]: {[lane_meta[i] for i in mask.tolist()]}')
+                # print(f'lane_meta[mask]: {[lane_meta[i] for i in mask.tolist()]}')
 
             return valid_topk_indices
 
