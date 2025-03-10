@@ -352,8 +352,6 @@ class NuScenesData(SingleAgentDataset):
             return None
 
         self.instance_token, self.sample_token = token[0], token[1]  # token
-        print(f'self.instance_token: {self.instance_token}')
-        print(f'self.sample_token: {self.sample_token}')
         self.sample = self.nuscenes.get('sample', self.sample_token)
         self.scene_token = self.sample['scene_token']
         self.scene = self.nuscenes.get('scene', self.scene_token)
@@ -364,6 +362,7 @@ class NuScenesData(SingleAgentDataset):
 
         # helper.get_sample_annotation always returns vehicle (`'vehicle' in ego_car_info['category_name']` always TRUE)
         ego_car_info = self.helper.get_sample_annotation(sample_token=self.sample_token, instance_token=self.instance_token)
+        print('---------------------------------------------')
         print(f'idx = {idx}, ego_car_info:')
         pprint(ego_car_info)
         self.cent_x, self.cent_y = ego_car_info['translation'][0], ego_car_info['translation'][1]  # global
