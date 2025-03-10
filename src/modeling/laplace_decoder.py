@@ -264,6 +264,13 @@ class GRUDecoder(nn.Module):
 
         print(f'-------------------------------------------------')
         for idx in random_idxs:
+            instance_token = utils.get_from_mapping(mapping, 'file_name')[idx]
+            sample_token = utils.get_from_mapping(mapping, 'sample_token')[idx]
+            city_name = utils.get_from_mapping(mapping, 'city_name')[idx]
+            angle = utils.get_from_mapping(mapping, 'angle')[idx]
+            print(f'instance_token: {instance_token}\nsample_token: {sample_token}\n'
+                  f'city_name: {city_name}\nangle: {angle}\nactual angle: {- (angle - math.pi / 2)}')
+
             print(f'random batch idx = {idx}, debug_topk: {debug_topk}')
             for idx2 in range(idx * future_frame_num, (idx + 1) * future_frame_num):
                 print(f'    dense_lane_top{debug_topk}_scores: {dense_lane_topk_scores[idx2][:debug_topk]}')
@@ -318,13 +325,6 @@ class GRUDecoder(nn.Module):
             global_embed: hidden states of agents after encoding by global graph
                 [batch_size, hidden_size]
         """
-        instance_token = utils.get_from_mapping(mapping, 'file_name')
-        sample_token = utils.get_from_mapping(mapping, 'sample_token')
-        city_name = utils.get_from_mapping(mapping, 'city_name')
-        angle = utils.get_from_mapping(mapping, 'angle')
-        print(f'instance_token: {instance_token}\nsample_token: {sample_token}\n'
-              f'city_name: {city_name}\nangle: {angle}\nactual angle: {- (angle - math.pi / 2)}')
-
         labels = utils.get_from_mapping(mapping, 'labels')
         labels_is_valid = utils.get_from_mapping(mapping, 'labels_is_valid')
         loss = torch.zeros(batch_size, device=device)
