@@ -15,6 +15,9 @@ import multiprocessing
 import zlib
 import os
 import sys
+
+from numpy import ndarray
+
 root_path = os.path.abspath(__file__)
 root_path = '/'.join(root_path.split('/')[:-2])
 sys.path.append(root_path)
@@ -230,13 +233,14 @@ class NuScenesData(SingleAgentDataset):
         """
         return len(self.token_list)
 
-    def initialize(self):
+    def reinitialize(self):
         """
         reset some important variables
         """
         self.agents_past_traj_abs = []
         self.agents_past_traj_rel = []
 
+        ############################## idx1 ##############################
         # lanes_midlines_abs: list of lanes (each nearby lane = a single List[Tuple[float, float, float]])
         #   = List[Lane] = List[List[Point]] = List[List[Tuple[float, float, float]]]
         #   lanes: midline = list of mid-points of a single lane
@@ -244,11 +248,24 @@ class NuScenesData(SingleAgentDataset):
         #       all nearby lanes are retrieved by get_lanes_in_radius
         #       then, each lane is discretized into multiple lane poses
         self.lanes_midline_abs: List[List[Tuple[float, float, float]]] = []
-        self.valid_lanes_midline_abs = [] # true_angle_abs (3rd element in each list) = x - pi/2
+        ############################## idx1 ##############################
+
+        ############################## idx2 ##############################
+        self.valid_lanes_midline_abs: List[ndarray] = [] # correct true_angle_abs (3rd element in each list) (from API)
 
         # list of lanes (after filtered), converted to relative coordinate from self.lanes_midline_abs
-        self.valid_lanes_midline_rel = [] # true_angle_rel (3rd element in each list) = x - pi/2
+        self.valid_lanes_midline_rel = [] # does not have angle_rel for now
         self.valid_lane_traj_tokens = [] # corresponding lane token from self.valid_lanes_midline_rel
+        ############################## idx2 ##############################
+
+        ############################## idx3 ##############################
+        # dense_lane_aware in decoder will use idx3
+        self.subdivided_lane_traj_rel = [] # sliced (valid) lane segments, each segment is a list of lane poses (in relative coordinate)
+        self.subdivided_lane_to_idx2 = [] # mapping to index of lane in valid_lane_traj_tokens
+        self.subdivided_lane_to_lane_midline_abs = [] # map idx3 to self.valid_lanes_midline_abs[idx2] + (angle,)
+        self.rel_ind_2_abs_ind_offset = []
+        ############################## idx3 ##############################
+
         self.polygons = []
 
         # Ground truth label of the lane scores at each time step in the future
@@ -266,7 +283,7 @@ class NuScenesData(SingleAgentDataset):
         :return self.mapping: Dictionary with necessary info
         """
         self.idx = idx
-        self.initialize()
+        self.reinitialize()
         rt = self.extract_ego_info(idx)
         if rt is None:
             return self.mapping
@@ -446,7 +463,7 @@ class NuScenesData(SingleAgentDataset):
                 vector[-6] = i_point
                 vector[-7] = len(self.polyline_spans)
                 if self.semantic_lane:
-                    flags = self.lanes_attrs['has_traffic_control'][self.subdivided_lane_2_origin_lane_labels[i_polygon]]
+                    flags = self.lanes_attrs['has_traffic_control'][self.subdivided_lane_to_idx2[i_polygon]]
                     flag = flags[self.rel_ind_2_abs_ind_offset[i_polygon] + i_point]
 
                     if flag.any():
@@ -458,10 +475,10 @@ class NuScenesData(SingleAgentDataset):
                         vector[-11] = -1
                         vector[-12] = -1
 
-                    direction = self.lanes_attrs['turn_direction'][self.subdivided_lane_2_origin_lane_labels[i_polygon]]
+                    direction = self.lanes_attrs['turn_direction'][self.subdivided_lane_to_idx2[i_polygon]]
                     vector[-9] = 1 if direction == 'R' else -1 if direction == 'L' else 0
 
-                    vector[-10] = 1 if self.lanes_attrs['is_intersection'][self.subdivided_lane_2_origin_lane_labels[i_polygon]] else -1
+                    vector[-10] = 1 if self.lanes_attrs['is_intersection'][self.subdivided_lane_to_idx2[i_polygon]] else -1
 
                 point_pre_pre = (2 * polygon[i_point-1][0] - point[0],
                                  2 * polygon[i_point-1][1] - point[1])
@@ -540,24 +557,27 @@ class NuScenesData(SingleAgentDataset):
             assert index < 2 * self.args['t_f']
             pose_at_index = self.ego_future_traj_rel[index]
             if len(self.subdivided_lane_traj_rel) == 0:
-                label = 0
+                gt_lane_segment_idx3 = 0 # index of the ground-truth lane in self.subdivided_lane_traj_rel
             else:
-                label = np.argmin([min(get_dis_list(lane, pose_at_index)) for lane in self.subdivided_lane_traj_rel])
-            self.stepwise_label[index] = label
+                gt_lane_segment_idx3 = np.argmin([min(get_dis_list(lane, pose_at_index)) for lane in self.subdivided_lane_traj_rel])
+            self.stepwise_label[index] = gt_lane_segment_idx3
             print(f'-------------------------------------------------------')
-            print(f'self.stepwise_label[{index}]: {label}')
-            print(f'self.subdivided_lane_traj_rel[{label}]: {self.subdivided_lane_traj_rel[label]}')
-            original_lane_idx = self.subdivided_lane_2_origin_lane_labels[label]
-            print(f'original_lane_idx: {original_lane_idx}')
-            print(f'self.valid_lane_traj_tokens[{original_lane_idx}]: {self.valid_lane_traj_tokens[original_lane_idx]}')
-            print(f'self.valid_lanes_midline_abs[{original_lane_idx}]: {self.valid_lanes_midline_abs[original_lane_idx]}')
+            print(f'self.stepwise_label[{index}]: {gt_lane_segment_idx3}')
+            print(f'self.subdivided_lane_traj_rel[{gt_lane_segment_idx3}]: {self.subdivided_lane_traj_rel[gt_lane_segment_idx3]}')
+            lane_idx_2 = self.subdivided_lane_to_idx2[gt_lane_segment_idx3]
+            print(f'lane_idx_2: {lane_idx_2}')
+            print(f'self.valid_lane_traj_tokens[{lane_idx_2}]: {self.valid_lane_traj_tokens[lane_idx_2]}')
+            print(f'self.valid_lanes_midline_abs[{lane_idx_2}]: {self.valid_lanes_midline_abs[lane_idx_2]}')
+            print(f'self.valid_lanes_midline_abs[0].shape: {self.valid_lanes_midline_abs[0].shape}')
+            print(f'self.subdivided_lane_to_lane_midline_abs[{gt_lane_segment_idx3}]: {self.subdivided_lane_to_lane_midline_abs[gt_lane_segment_idx3]}')
+            # ^ above indexing are correct (verified)
             print(f'-------------------------------------------------------')
         agent_goal_poses = self.ego_future_traj_rel[2*self.args['t_f'] - 1]
         if len(self.agents_past_traj_rel) == 0:
-            label = 0
+            gt_lane_segment_idx3 = 0
         else:
-            label = np.argmin([min(get_dis_list(agent, agent_goal_poses)) for agent in self.agents_past_traj_rel])
-        self.goal_agent_label = label
+            gt_lane_segment_idx3 = np.argmin([min(get_dis_list(agent, agent_goal_poses)) for agent in self.agents_past_traj_rel])
+        self.goal_agent_label = gt_lane_segment_idx3
         return 0
 
     def update(self):
@@ -581,11 +601,11 @@ class NuScenesData(SingleAgentDataset):
             past_traj=self.ego_past_traj_rel,
             trajs=self.agents_past_traj_rel,
             polygons=self.subdivided_lane_traj_rel,
-            polyline_spans=[slice(each[0], each[1]) for each in self.polyline_spans],
+            polyline_spans=[slice(each[0], each[1]) for each in self.polyline_spans], # generated from the index of self.subdivided_lane_traj_rel
             map_start_polyline_idx=self.map_start_polyline_idx,
             matrix=np.array(self.vectors),
 
-            dense_lane_labels=self.stepwise_label,
+            dense_lane_labels=self.stepwise_label, # index of the GT lane segment (for 12 time steps)
             goal_agent_label=self.goal_agent_label,
         )
 
@@ -694,10 +714,13 @@ class NuScenesData(SingleAgentDataset):
         while True:
             if length - left_index >= bound:
                 self.subdivided_lane_traj_rel.append(lane_poses[left_index:left_index + bound])
-                self.subdivided_lane_2_origin_lane_labels.append(l_id)
+                self.subdivided_lane_to_idx2.append(l_id)
 
-                if len(self.subdivided_lane_2_origin_lane_labels) == 1 or \
-                        self.subdivided_lane_2_origin_lane_labels[-1] != self.subdivided_lane_2_origin_lane_labels[
+                lane_midline_abs = np.append(self.valid_lanes_midline_abs[l_id], self.valid_lane_traj_tokens[l_id])
+                self.subdivided_lane_to_lane_midline_abs.append(lane_midline_abs)
+
+                if len(self.subdivided_lane_to_idx2) == 1 or \
+                        self.subdivided_lane_to_idx2[-1] != self.subdivided_lane_to_idx2[
                     -2]:
                     self.rel_ind_2_abs_ind_offset.append(0)
                 else:
@@ -707,10 +730,10 @@ class NuScenesData(SingleAgentDataset):
                 left_index += bound
             elif 1 < length - left_index < bound:
                 self.subdivided_lane_traj_rel.append(lane_poses[left_index:])
-                self.subdivided_lane_2_origin_lane_labels.append(l_id)
+                self.subdivided_lane_to_idx2.append(l_id)
 
-                if len(self.subdivided_lane_2_origin_lane_labels) == 1 or \
-                        self.subdivided_lane_2_origin_lane_labels[-1] != self.subdivided_lane_2_origin_lane_labels[
+                if len(self.subdivided_lane_to_idx2) == 1 or \
+                        self.subdivided_lane_to_idx2[-1] != self.subdivided_lane_to_idx2[
                     -2]:
                     self.rel_ind_2_abs_ind_offset.append(0)
                 else:
@@ -731,12 +754,6 @@ class NuScenesData(SingleAgentDataset):
             sliced lane segments of length 5. We still want to keep all (5) lane poses inside each segment,
             not just a single lane pose for each 5-meter segment
         """
-
-        # self.subdivided_lane_traj_abs = []
-        self.subdivided_lane_traj_rel = [] # sliced (valid) lane segments, each segment is a list of lane poses (in relative coordinate)
-        self.subdivided_lane_2_origin_lane_labels = [] # mapping to index of lane in valid_lane_traj_tokens
-        self.rel_ind_2_abs_ind_offset = []
-
         for lane_idx, lane_poses in enumerate(self.valid_lanes_midline_rel):
             if len(lane_poses) <= 1:
                 continue
@@ -748,7 +765,7 @@ class NuScenesData(SingleAgentDataset):
 
         self.subdivided_lane_traj_rel = np.array(self.subdivided_lane_traj_rel, dtype=object)
 
-        assert len(self.subdivided_lane_2_origin_lane_labels) == len(self.subdivided_lane_traj_rel)
+        assert len(self.subdivided_lane_to_idx2) == len(self.subdivided_lane_traj_rel)
 
     def get_lane_midlines(self):
         """
@@ -782,7 +799,7 @@ class NuScenesData(SingleAgentDataset):
 
         # list of token with index corresponding to self.lanes_midlines_abs's index
         # lane_traj_tokens[0] = token of lane retrieved from self.lanes_midlines_abs[0]
-        lane_traj_tokens = []
+        lane_traj_tokens = [] # idx1
         i = 0
         print_count = 0
         for lane_token, lane_poses in lanes.items():

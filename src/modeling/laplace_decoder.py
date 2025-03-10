@@ -127,7 +127,7 @@ class GRUDecoder(nn.Module):
         Tensor shape explanation:
             feature: hidden_size (size of latent vector)
             N: batch size
-            H: t_f = number of future time steps (default = 12)
+            H: t_f * 2 = number of future time steps (default = 6s * 2Hz)
             seq_len: max_len / max_num_lanes / max_lane_states_length / maximum number of lane states from encoder
                 Each lane has different number (e.g. 62, 88, ...); Each iteration has different max_lane_states_length (e.g. 290, 289, 292, ...)
 
@@ -215,6 +215,16 @@ class GRUDecoder(nn.Module):
         print(f'(3) dense_lane_pred.shape: {dense_lane_pred.shape}')
         dense_lane_pred = dense_lane_pred.contiguous().view(-1, max_vector_num)  # [N*H, max_len]
         print(f'(4) dense_lane_pred.shape: {dense_lane_pred.shape}')
+
+        # dense_lane_pred: prediction about the probability of each lane segment index that the agent will go to
+        #       ^ that's why size = [N*H, max_len] <= max_len is # lane segments
+        # dense_lane_targets: GT lane segment index
+        #   ^ index of what? => self.subdivided_lane_traj_rel
+        # TODO:
+        #   when we have lane segment index (dense_lane_pred index in dimension max_len),
+        #   can use this index to get the angle_abs -> relative angle to agent
+        #       How to map index -> angle_abs (or rel)?
+        #       => check log insrc/datascripts/dataloader_nuscenes.py:547
 
         future_frame_num = self.future_frame_num  # H
 
