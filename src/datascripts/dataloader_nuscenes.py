@@ -710,6 +710,7 @@ class NuScenesData(SingleAgentDataset):
                 self.subdivided_lane_traj_rel.append(lane_poses[left_index:left_index + bound])
                 self.subdivided_lane_to_idx2.append(l_id)
 
+                # TODO: refactor to 1 call (1 call below)
                 lane_midline_abs = np.append(self.valid_lanes_midline_abs[l_id][0][2], self.valid_lane_traj_tokens[l_id])
                 self.subdivided_lane_to_lane_meta.append(lane_midline_abs)
 
@@ -726,6 +727,7 @@ class NuScenesData(SingleAgentDataset):
                 self.subdivided_lane_traj_rel.append(lane_poses[left_index:])
                 self.subdivided_lane_to_idx2.append(l_id)
 
+                # TODO: refactor to 1 call (1 call above)
                 lane_midline_abs = np.append(self.valid_lanes_midline_abs[l_id][0][2], self.valid_lane_traj_tokens[l_id])
                 self.subdivided_lane_to_lane_meta.append(lane_midline_abs)
 
