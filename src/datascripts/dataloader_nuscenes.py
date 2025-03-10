@@ -252,7 +252,7 @@ class NuScenesData(SingleAgentDataset):
         ############################## idx1 ##############################
 
         ############################## idx2 ##############################
-        self.valid_lanes_midline_abs: List[ndarray[(Any, 3), dtype]] = [] # correct true_angle_abs (3rd element in each list) (from API)
+        self.valid_lanes_midline_abs: List[ndarray[(Any, 2), dtype]] = [] # correct true_angle_abs (3rd element in each list) (from API)
 
         # list of lanes (after filtered), converted to relative coordinate from self.lanes_midline_abs
         self.valid_lanes_midline_rel = [] # does not have angle_rel for now
