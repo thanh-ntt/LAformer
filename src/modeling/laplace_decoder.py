@@ -197,19 +197,25 @@ class GRUDecoder(nn.Module):
             # assert pred_score.shape[0] == len(lane_meta)
             pred_score_processed = torch.tensor(pred_score, device=device)
             ego_angle_abs = - (utils.get_from_mapping(mapping, 'angle')[batch_idx] - math.pi / 2)
+
+            invalid_lane_indices = []
             for lane_idx in range(0, len(lane_meta)):
                 lane_angle, _, layer = lane_meta[lane_idx]
                 if layer == 'lane' and compute_angle_diff(lane_angle, ego_angle_abs) > (math.pi * 2 / 3):
+                    invalid_lane_indices.append(lane_idx)
                     pred_score_processed[lane_idx] *= 2 # penalty is *2 (score is log of prob - always negative))
-                    self.angle_diff_num += 1
+
             _, topk_indices = torch.topk(pred_score, k)
             _, valid_topk_indices = torch.topk(pred_score_processed, k)
             sum_topk_indices = torch.exp(pred_score[topk_indices]).sum()
+            sum_valid_topk_indices = torch.exp(pred_score_processed[valid_topk_indices]).sum()
             print(f'topk_indices: {topk_indices}, sum(topk_indices): {sum_topk_indices}')
-            print(f'valid_topk_indices: {valid_topk_indices}')
+            print(f'valid_topk_indices: {valid_topk_indices}, sum(valid_topk_indices): {sum_valid_topk_indices}')
             if not torch.equal(pred_score, pred_score_processed):
-                filtered_indices = ~torch.isin(topk_indices, valid_topk_indices)
-                print(f'lane_meta[filtered_indices]: {[lane_meta[i] for i in filtered_indices.tolist()]}')
+                mask = ~torch.isin(topk_indices, valid_topk_indices)
+                print(f'mask: {mask}')
+                self.angle_diff_num += mask.sum()
+                print(f'lane_meta[mask]: {[lane_meta[i] for i in mask.tolist()]}')
 
             return valid_topk_indices
 
