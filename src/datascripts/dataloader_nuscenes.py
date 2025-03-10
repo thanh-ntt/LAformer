@@ -252,7 +252,7 @@ class NuScenesData(SingleAgentDataset):
         ############################## idx1 ##############################
 
         ############################## idx2 ##############################
-        self.valid_lanes_midline_abs: List[ndarray[(Any, 2), dtype]] = [] # correct true_angle_abs (3rd element in each list) (from API)
+        self.valid_lanes_midline_abs: List[ndarray] = [] # correct true_angle_abs (3rd element in each list) (from API)
 
         # list of lanes (after filtered), converted to relative coordinate from self.lanes_midline_abs
         self.valid_lanes_midline_rel = [] # does not have angle_rel for now
@@ -564,15 +564,9 @@ class NuScenesData(SingleAgentDataset):
             self.stepwise_label[index] = gt_lane_segment_idx3
             print(f'-------------------------------------------------------')
             print(f'self.stepwise_label[{index}]: {gt_lane_segment_idx3}')
-            print(f'self.subdivided_lane_traj_rel[{gt_lane_segment_idx3}]: {self.subdivided_lane_traj_rel[gt_lane_segment_idx3]}')
-            lane_idx_2 = self.subdivided_lane_to_idx2[gt_lane_segment_idx3]
-            print(f'lane_idx_2: {lane_idx_2}')
-            print(f'self.valid_lane_traj_tokens[{lane_idx_2}]: {self.valid_lane_traj_tokens[lane_idx_2]}')
-            print(f'self.valid_lanes_midline_abs[{lane_idx_2}]: {self.valid_lanes_midline_abs[lane_idx_2]}')
-            print(f'self.valid_lanes_midline_abs[0].shape: {self.valid_lanes_midline_abs[0].shape}')
+            print(f'self.valid_lane_traj_tokens[{self.subdivided_lane_to_idx2[gt_lane_segment_idx3]}]: {self.valid_lane_traj_tokens[lane_idx_2]}')
             print(f'self.subdivided_lane_to_lane_midline_abs[{gt_lane_segment_idx3}]: {self.subdivided_lane_to_lane_meta[gt_lane_segment_idx3]}')
             # ^ above indexing are correct (verified)
-            print(f'-------------------------------------------------------')
         agent_goal_poses = self.ego_future_traj_rel[2*self.args['t_f'] - 1]
         if len(self.agents_past_traj_rel) == 0:
             gt_lane_segment_idx3 = 0
