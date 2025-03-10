@@ -212,7 +212,7 @@ class GRUDecoder(nn.Module):
             sum_valid_topk_indices = torch.exp(pred_score_processed[valid_topk_indices]).sum()
             # print(f'topk_indices: {topk_indices}, sum(topk_indices): {sum_topk_indices}')
             # print(f'valid_topk_indices: {valid_topk_indices}, sum(valid_topk_indices): {sum_valid_topk_indices}')
-            if not torch.equal(pred_score, pred_score_processed):
+            if not torch.equal(topk_indices, valid_topk_indices):
                 mask = ~torch.isin(topk_indices, valid_topk_indices)
                 print(f'mask: {mask}')
                 self.angle_diff_num += mask.sum()
