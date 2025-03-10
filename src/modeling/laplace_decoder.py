@@ -209,7 +209,7 @@ class GRUDecoder(nn.Module):
             print(f'valid_topk_indices: {valid_topk_indices}')
             if not torch.equal(pred_score, pred_score_processed):
                 filtered_indices = ~torch.isin(topk_indices, valid_topk_indices)
-                print(f'lane_meta[filtered_indices]: {lane_meta[filtered_indices]}')
+                print(f'lane_meta[filtered_indices]: {[lane_meta[i] for i in filtered_indices.tolist()]}')
 
             return valid_topk_indices
 
