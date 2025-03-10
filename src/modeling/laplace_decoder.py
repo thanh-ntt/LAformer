@@ -204,7 +204,7 @@ class GRUDecoder(nn.Module):
         batch_size = len(mapping)
         # print(f'batch_size: {batch_size}')
         # print('mapping[0].keys():')
-        pprint(mapping[0].keys())
+        # pprint(mapping[0].keys())
         src_attention_mask_lane = torch.zeros([batch_size, lane_states_batch.shape[1]], device=device) # [N, max_len]
         for i in range(batch_size):
             assert lane_states_length[i] > 0
