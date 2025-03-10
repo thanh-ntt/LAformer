@@ -732,6 +732,9 @@ class NuScenesData(SingleAgentDataset):
                 self.subdivided_lane_traj_rel.append(lane_poses[left_index:])
                 self.subdivided_lane_to_idx2.append(l_id)
 
+                lane_midline_abs = np.append(self.valid_lanes_midline_abs[l_id], self.valid_lane_traj_tokens[l_id])
+                self.subdivided_lane_to_lane_midline_abs.append(lane_midline_abs)
+
                 if len(self.subdivided_lane_to_idx2) == 1 or \
                         self.subdivided_lane_to_idx2[-1] != self.subdivided_lane_to_idx2[
                     -2]:
