@@ -562,10 +562,9 @@ class NuScenesData(SingleAgentDataset):
             else:
                 gt_lane_segment_idx3 = np.argmin([min(get_dis_list(lane, pose_at_index)) for lane in self.subdivided_lane_traj_rel])
             self.stepwise_label[index] = gt_lane_segment_idx3
-            print(f'-------------------------------------------------------')
-            print(f'self.stepwise_label[{index}]: {gt_lane_segment_idx3}')
-            lane_idx_2 = self.subdivided_lane_to_idx2[gt_lane_segment_idx3]
-            print(f'self.valid_lanes_midline_abs[{lane_idx_2}]: {self.valid_lanes_midline_abs[lane_idx_2]}')
+            # print(f'-------------------------------------------------------')
+            # lane_idx_2 = self.subdivided_lane_to_idx2[gt_lane_segment_idx3]
+            # print(f'self.valid_lanes_midline_abs[{lane_idx_2}]: {self.valid_lanes_midline_abs[lane_idx_2]}')
             print(f'self.subdivided_lane_to_lane_midline_abs[{gt_lane_segment_idx3}]: {self.subdivided_lane_to_lane_meta[gt_lane_segment_idx3]}')
             # ^ above indexing are correct (verified)
         agent_goal_poses = self.ego_future_traj_rel[2*self.args['t_f'] - 1]
