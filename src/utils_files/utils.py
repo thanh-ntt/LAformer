@@ -958,7 +958,7 @@ def get_random_ints(batch_size: int, num_ints: int) -> List[int]:
 def compute_angle_diff(angle_1, angle_2) -> float:
     angle_1 = float(angle_1)
     angle_2 = float(angle_2)
-    diff = abs(angle_1 - angle_2)
+    diff = abs(angle_1 - angle_2) % (2 * math.pi)
     diff = min(diff, 2 * math.pi - diff)
     try:
         assert 0.0 <= diff <= math.pi
