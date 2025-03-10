@@ -955,3 +955,10 @@ def get_random_ints(batch_size: int, num_ints: int) -> List[int]:
     # this is deterministic as `random.seed(args.seed)`  has been invoked before
     return [random.randint(0, batch_size - 1) for _ in range(num_ints)]
 
+def compute_angle_diff(angle_1: float, angle_2: float) -> float:
+    if angle_1 < angle_2:
+        angle_1 += 2 * math.pi
+    diff = angle_1 - angle_2
+    if diff > math.pi:
+        diff = 2 * math.pi - diff
+    return diff

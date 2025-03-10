@@ -11,7 +11,7 @@ from torch import nn, Tensor
 from typing import Dict, List, Tuple, NamedTuple, Any
 import numpy as np
 from utils_files import utils, config
-from utils_files.utils import init_weights, get_random_ints
+from utils_files.utils import init_weights, get_random_ints, compute_angle_diff
 from modeling.vectornet import *
 from modeling.motion_refinement import trajectory_refinement
 from utils_files.loss import *
@@ -107,6 +107,11 @@ class GRUDecoder(nn.Module):
                 # for p in vectornet.parameters():
                 #     p.requires_grad = False
             self.trajectory_refinement = trajectory_refinement(args)
+
+        self.lane_segment_num = 0
+        self.angle_diff_num = 0
+        self.lane_segment_debug_num = 0
+        self.angle_diff_debug_num = 0
 
     def dense_lane_aware(self, i, mapping: List[Dict], lane_states_batch, lane_states_length, element_hidden_states, \
                             element_hidden_states_lengths, global_hidden_states, device, loss):
@@ -247,7 +252,6 @@ class GRUDecoder(nn.Module):
 
         dense_lane_topk_lane_meta = []
         subdivided_lane_to_lane_meta = utils.get_from_mapping(mapping, 'subdivided_lane_to_lane_meta')
-        random_idxs = get_random_ints(batch_size, 10)
 
         debug_topk = 5
         for i in range(dense_lane_topk_scores.shape[0]): # for each i in N*H (batch_size * future_frame_num)
@@ -258,24 +262,41 @@ class GRUDecoder(nn.Module):
             dense_lane_topk_scores[i][:k] = dense_lane_pred[i][topk_idxs] # [N*H, mink]
 
             _, debug_topk_idxs = torch.topk(dense_lane_pred[i], debug_topk)
+
             dense_lane_topk_lane_meta.append(
                 [subdivided_lane_to_lane_meta[batch_idx][index] for index in debug_topk_idxs.tolist()]
             )
 
-        print(f'-------------------------------------------------')
-        for idx in random_idxs:
-            instance_token = utils.get_from_mapping(mapping, 'file_name')[idx]
-            sample_token = utils.get_from_mapping(mapping, 'sample_token')[idx]
-            city_name = utils.get_from_mapping(mapping, 'city_name')[idx]
-            angle = utils.get_from_mapping(mapping, 'angle')[idx]
-            print(f'instance_token: {instance_token}\nsample_token: {sample_token}\n'
-                  f'city_name: {city_name}\nangle: {angle}\nactual angle: {- (angle - math.pi / 2)}')
+            self.lane_segment_num += topk_idxs.size(0)
+            self.lane_segment_debug_num += debug_topk_idxs.size(0)
+            ego_angle_abs = utils.get_from_mapping(mapping, 'angle')[batch_idx]
+            for top_idx in topk_idxs.tolist():
+                lane_angle = subdivided_lane_to_lane_meta[batch_idx][top_idx]
+                if compute_angle_diff(lane_angle, ego_angle_abs) > (math.pi * 4 / 3):
+                    self.angle_diff_num += 1
+            for top_idx in debug_topk_idxs.tolist():
+                lane_angle = subdivided_lane_to_lane_meta[batch_idx][top_idx]
+                if compute_angle_diff(lane_angle, ego_angle_abs) > (math.pi * 4 / 3):
+                    self.angle_diff_debug_num += 1
 
-            print(f'random batch idx = {idx}, debug_topk: {debug_topk}')
-            for idx2 in range(idx * future_frame_num, (idx + 1) * future_frame_num):
-                print(f'    dense_lane_top{debug_topk}_scores: {dense_lane_topk_scores[idx2][:debug_topk]}')
-                print(f'    dense_lane_top{debug_topk}_lane_meta: {dense_lane_topk_lane_meta[idx2][:debug_topk]}')
-        print(f'-------------------------------------------------')
+        print(f'lane_segment_num: {self.lane_segment_num}, angle_diff_num: {self.angle_diff_num}')
+        print(f'lane_segment_debug_num: {self.lane_segment_debug_num}, angle_diff_debug_num: {self.angle_diff_debug_num}')
+
+        # print(f'-------------------------------------------------')
+        # random_idxs = get_random_ints(batch_size, 10)
+        # for idx in random_idxs:
+        #     instance_token = utils.get_from_mapping(mapping, 'file_name')[idx]
+        #     sample_token = utils.get_from_mapping(mapping, 'sample_token')[idx]
+        #     city_name = utils.get_from_mapping(mapping, 'city_name')[idx]
+        #     angle = utils.get_from_mapping(mapping, 'angle')[idx]
+        #     print(f'instance_token: {instance_token}\nsample_token: {sample_token}\n'
+        #           f'city_name: {city_name}\nangle: {angle}\nactual angle: {- (angle - math.pi / 2)}')
+        #
+        #     print(f'random batch idx = {idx}, debug_topk: {debug_topk}')
+        #     for idx2 in range(idx * future_frame_num, (idx + 1) * future_frame_num):
+        #         print(f'    dense_lane_top{debug_topk}_scores: {dense_lane_topk_scores[idx2][:debug_topk]}')
+        #         print(f'    dense_lane_top{debug_topk}_lane_meta: {dense_lane_topk_lane_meta[idx2][:debug_topk]}')
+        # print(f'-------------------------------------------------')
 
         # obtain candidate lane encodings C = ConCat{c_{1:k}, s^_{1:k}}^{t_f}_{t=1}
         dense_lane_topk = torch.cat([dense_lane_topk, dense_lane_topk_scores.unsqueeze(-1)], dim=-1) # [N*H, mink, hidden_size + 1]
