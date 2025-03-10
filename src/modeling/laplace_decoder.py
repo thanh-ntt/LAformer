@@ -257,17 +257,17 @@ class GRUDecoder(nn.Module):
 
             # TODO: verify this works
             print(f'topk_idxs.tolist(): {topk_idxs.tolist()}')
-            print(f'len(subdivided_lane_to_lane_meta[i]): {len(subdivided_lane_to_lane_meta[i])}')
+            print(f'len(subdivided_lane_to_lane_meta[{batch_idx}]): {len(subdivided_lane_to_lane_meta[batch_idx])}')
             dense_lane_topk_lane_meta.append(
-                [subdivided_lane_to_lane_meta[i][index] for index in topk_idxs.tolist()]
+                [subdivided_lane_to_lane_meta[batch_idx][index] for index in topk_idxs.tolist()]
             )
 
         print(f'-------------------------------------------------')
         for idx in random_idxs:
-            print(f'random idx = {idx}::')
+            print(f'random batch idx = {idx}::')
             for idx2 in range(idx * future_frame_num, (idx + 1) * future_frame_num):
                 print(f'    dense_lane_topk_scores: {dense_lane_topk_scores[idx2][:mink]}')
-                print(f'    subdivided_lane_to_lane_meta: {subdivided_lane_to_lane_meta[idx2][:mink]}')
+                print(f'    dense_lane_topk_lane_meta: {dense_lane_topk_lane_meta[idx2][:mink]}')
         print(f'-------------------------------------------------')
 
         # obtain candidate lane encodings C = ConCat{c_{1:k}, s^_{1:k}}^{t_f}_{t=1}
