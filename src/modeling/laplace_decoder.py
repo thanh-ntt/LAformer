@@ -250,7 +250,6 @@ class GRUDecoder(nn.Module):
         dense_lane_topk_scores = torch.zeros((dense_lane_pred.shape[0], mink), device=device)   # [N*H, mink]
         print(f'dense_lane_topk_scores.shape: {dense_lane_topk_scores.shape}')
 
-        dense_lane_topk_lane_meta = []
         subdivided_lane_to_lane_meta = utils.get_from_mapping(mapping, 'subdivided_lane_to_lane_meta')
 
         debug_topk = 5
@@ -263,19 +262,18 @@ class GRUDecoder(nn.Module):
 
             _, debug_topk_idxs = torch.topk(dense_lane_pred[i], debug_topk)
 
-            dense_lane_topk_lane_meta.append(
-                [subdivided_lane_to_lane_meta[batch_idx][index] for index in debug_topk_idxs.tolist()]
-            )
+            topk_lane_meta = [subdivided_lane_to_lane_meta[batch_idx][index] for index in topk_idxs.tolist()]
+            topk_debug_lane_meta = [subdivided_lane_to_lane_meta[batch_idx][index] for index in debug_topk_idxs.tolist()]
 
             self.lane_segment_num += topk_idxs.size(0)
             self.lane_segment_debug_num += debug_topk_idxs.size(0)
             ego_angle_abs = utils.get_from_mapping(mapping, 'angle')[batch_idx]
-            for top_idx in topk_idxs.tolist():
-                lane_angle = subdivided_lane_to_lane_meta[batch_idx][top_idx, 0]
+            for j, _ in enumerate(topk_idxs.tolist()):
+                lane_angle = topk_lane_meta[j][0]
                 if compute_angle_diff(lane_angle, ego_angle_abs) > (math.pi * 4 / 3):
                     self.angle_diff_num += 1
-            for top_idx in debug_topk_idxs.tolist():
-                lane_angle = subdivided_lane_to_lane_meta[batch_idx][top_idx, 0]
+            for j, _ in enumerate(debug_topk_idxs.tolist()):
+                lane_angle = topk_debug_lane_meta[j][0]
                 if compute_angle_diff(lane_angle, ego_angle_abs) > (math.pi * 4 / 3):
                     self.angle_diff_debug_num += 1
 
