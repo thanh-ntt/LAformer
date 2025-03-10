@@ -244,9 +244,8 @@ class GRUDecoder(nn.Module):
         dense_lane_topk_scores = torch.zeros((dense_lane_pred.shape[0], mink), device=device)   # [N*H, mink]
         print(f'dense_lane_topk_scores.shape: {dense_lane_topk_scores.shape}')
 
-        dense_lane_topk_lane_meta = torch.zeros((dense_lane_pred.shape[0], mink, 2), device=device)
+        dense_lane_topk_lane_meta = []
         subdivided_lane_to_lane_meta = utils.get_from_mapping(mapping, 'subdivided_lane_to_lane_meta')
-        subdivided_lane_to_lane_meta = torch.tensor(subdivided_lane_to_lane_meta, dtype=torch.float32)
         random_idxs = get_random_ints(batch_size, 10)
 
         for i in range(dense_lane_topk_scores.shape[0]): # for each i in N*H (batch_size * future_frame_num)
@@ -257,7 +256,7 @@ class GRUDecoder(nn.Module):
             dense_lane_topk_scores[i][:k] = dense_lane_pred[i][topk_idxs] # [N*H, mink]
 
             # TODO: verify this works
-            dense_lane_topk_lane_meta[i][:k] = subdivided_lane_to_lane_meta[i][topk_idxs.tolist()]
+            dense_lane_topk_lane_meta.append(subdivided_lane_to_lane_meta[i][topk_idxs.tolist()])
 
         print(f'-------------------------------------------------')
         for idx in random_idxs:
