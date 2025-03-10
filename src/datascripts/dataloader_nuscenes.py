@@ -17,6 +17,7 @@ import os
 import sys
 
 from numpy import ndarray
+from torch import dtype
 
 root_path = os.path.abspath(__file__)
 root_path = '/'.join(root_path.split('/')[:-2])
@@ -262,7 +263,7 @@ class NuScenesData(SingleAgentDataset):
         # dense_lane_aware in decoder will use idx3
         self.subdivided_lane_traj_rel = [] # sliced (valid) lane segments, each segment is a list of lane poses (in relative coordinate)
         self.subdivided_lane_to_idx2 = [] # mapping to index of lane in valid_lane_traj_tokens
-        self.subdivided_lane_to_lane_midline_abs = [] # map idx3 to self.valid_lanes_midline_abs[idx2] + (angle,)
+        self.subdivided_lane_to_lane_meta = [] # map idx3 to lane angle + token (angle = self.valid_lanes_midline_abs[idx2][0][2])
         self.rel_ind_2_abs_ind_offset = []
         ############################## idx3 ##############################
 
@@ -569,7 +570,7 @@ class NuScenesData(SingleAgentDataset):
             print(f'self.valid_lane_traj_tokens[{lane_idx_2}]: {self.valid_lane_traj_tokens[lane_idx_2]}')
             print(f'self.valid_lanes_midline_abs[{lane_idx_2}]: {self.valid_lanes_midline_abs[lane_idx_2]}')
             print(f'self.valid_lanes_midline_abs[0].shape: {self.valid_lanes_midline_abs[0].shape}')
-            print(f'self.subdivided_lane_to_lane_midline_abs[{gt_lane_segment_idx3}]: {self.subdivided_lane_to_lane_midline_abs[gt_lane_segment_idx3]}')
+            print(f'self.subdivided_lane_to_lane_midline_abs[{gt_lane_segment_idx3}]: {self.subdivided_lane_to_lane_meta[gt_lane_segment_idx3]}')
             # ^ above indexing are correct (verified)
             print(f'-------------------------------------------------------')
         agent_goal_poses = self.ego_future_traj_rel[2*self.args['t_f'] - 1]
@@ -716,8 +717,8 @@ class NuScenesData(SingleAgentDataset):
                 self.subdivided_lane_traj_rel.append(lane_poses[left_index:left_index + bound])
                 self.subdivided_lane_to_idx2.append(l_id)
 
-                lane_midline_abs = np.append(self.valid_lanes_midline_abs[l_id], self.valid_lane_traj_tokens[l_id])
-                self.subdivided_lane_to_lane_midline_abs.append(lane_midline_abs)
+                lane_midline_abs = np.append(self.valid_lanes_midline_abs[l_id][0][2], self.valid_lane_traj_tokens[l_id])
+                self.subdivided_lane_to_lane_meta.append(lane_midline_abs)
 
                 if len(self.subdivided_lane_to_idx2) == 1 or \
                         self.subdivided_lane_to_idx2[-1] != self.subdivided_lane_to_idx2[
@@ -733,7 +734,7 @@ class NuScenesData(SingleAgentDataset):
                 self.subdivided_lane_to_idx2.append(l_id)
 
                 lane_midline_abs = np.append(self.valid_lanes_midline_abs[l_id], self.valid_lane_traj_tokens[l_id])
-                self.subdivided_lane_to_lane_midline_abs.append(lane_midline_abs)
+                self.subdivided_lane_to_lane_meta.append(lane_midline_abs)
 
                 if len(self.subdivided_lane_to_idx2) == 1 or \
                         self.subdivided_lane_to_idx2[-1] != self.subdivided_lane_to_idx2[
@@ -796,8 +797,7 @@ class NuScenesData(SingleAgentDataset):
         self.lanes_attrs = {
             "has_traffic_control": [],
             "turn_direction": [],
-            "is_intersection": [],
-            "offset_angle_with_ego": []
+            "is_intersection": []
         }
 
         # list of token with index corresponding to self.lanes_midlines_abs's index
@@ -927,9 +927,6 @@ class NuScenesData(SingleAgentDataset):
                 #   ^ but to compute offset (difference) it's OK to keep '-'
                 li = self.valid_lanes_midline_abs[rel_li_idx]
                 lane_angle = - math.atan2(li[1][1] - li[0][1], li[1][0] - li[0][0]) + math.pi / 2
-
-                # compute difference between ego's angle (heading direction) and lane direction
-                self.lanes_attrs['offset_angle_with_ego'].append(self.angle - lane_angle)
 
                 if curvature < 100:
                     origin_point = li[0]
