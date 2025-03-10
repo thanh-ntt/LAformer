@@ -267,8 +267,6 @@ class NuScenesData(SingleAgentDataset):
         self.rel_ind_2_abs_ind_offset = []
         ############################## idx3 ##############################
 
-        self.polygons = []
-
         # Ground truth label of the lane scores at each time step in the future
         # self.stepwise_label[i] = index in self.subdivided_lane_traj_rel of the ground-truth lane segment
         self.stepwise_label = np.zeros((self.eval_frames))
@@ -598,6 +596,8 @@ class NuScenesData(SingleAgentDataset):
 
             dense_lane_labels=self.stepwise_label, # index of the GT lane segment (for 12 time steps)
             goal_agent_label=self.goal_agent_label,
+
+            subdivided_lane_to_lane_meta=self.subdivided_lane_to_lane_meta,
         )
 
     def get_agents_traj(self):
