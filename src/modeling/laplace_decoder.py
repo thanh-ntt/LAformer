@@ -108,8 +108,8 @@ class GRUDecoder(nn.Module):
                 #     p.requires_grad = False
             self.trajectory_refinement = trajectory_refinement(args)
 
-        self.lane_segment_num = 0
-        self.angle_diff_num = 0
+        self.lane_segment_in_topk_num = 0
+        self.invalid_lane_segment_in_topk_num = 0
 
     def dense_lane_aware(self, i, mapping: List[Dict], lane_states_batch, lane_states_length, element_hidden_states, \
                             element_hidden_states_lengths, global_hidden_states, device, loss):
@@ -202,7 +202,7 @@ class GRUDecoder(nn.Module):
             for lane_idx in range(0, len(lane_meta)):
                 lane_angle, _, layer = lane_meta[lane_idx]
                 # if layer == 'lane' and compute_angle_diff(lane_angle, ego_angle_abs) > (math.pi * 4 / 5):
-                if compute_angle_diff(lane_angle, ego_angle_abs) > (math.pi * 2 / 3):
+                if compute_angle_diff(lane_angle, ego_angle_abs) > (math.pi * 3 / 4):
                     invalid_lane_indices.append(lane_idx)
                     pred_score_processed[lane_idx] = - math.inf
 
@@ -216,6 +216,7 @@ class GRUDecoder(nn.Module):
                 for lane_idx in topk_indices:
                     if lane_idx not in valid_topk_indices:
                         print(f'invalid lane index {lane_idx}, lane_meta[{lane_idx}]: {lane_meta[lane_idx]}')
+                        self.invalid_lane_segment_in_topk_num += 1
 
             return valid_topk_indices
 
@@ -282,7 +283,7 @@ class GRUDecoder(nn.Module):
             dense_lane_topk[i][:k] = lane_states_batch[batch_idx, topk_idxs] # [N*H, mink, hidden_size]
             dense_lane_topk_scores[i][:k] = dense_lane_pred[i][topk_idxs] # [N*H, mink]
 
-            self.lane_segment_num += topk_idxs.size(0)
+            self.lane_segment_in_topk_num += topk_idxs.size(0)
 
             # topk_lane_meta = [subdivided_lane_to_lane_meta[batch_idx][index] for index in topk_idxs.tolist()]
             #
@@ -297,7 +298,7 @@ class GRUDecoder(nn.Module):
             #         print(f'ego_car_info: {ego_car_info}')
             #         self.angle_diff_num += 1
 
-        print(f'lane_segment_num: {self.lane_segment_num}, angle_diff_num: {self.angle_diff_num}, % = {self.angle_diff_num / self.lane_segment_num}')
+        print(f'lane_segment_num: {self.lane_segment_in_topk_num}, angle_diff_num: {self.invalid_lane_segment_in_topk_num}, % = {self.invalid_lane_segment_in_topk_num / self.lane_segment_in_topk_num}')
 
         # print(f'-------------------------------------------------')
         # random_idxs = get_random_ints(batch_size, 10)
