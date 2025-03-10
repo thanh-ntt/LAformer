@@ -202,7 +202,7 @@ class GRUDecoder(nn.Module):
             for lane_idx in range(0, len(lane_meta)):
                 lane_angle, _, layer = lane_meta[lane_idx]
                 # if layer == 'lane' and compute_angle_diff(lane_angle, ego_angle_abs) > (math.pi * 4 / 5):
-                if compute_angle_diff(lane_angle, ego_angle_abs) > (math.pi * 3 / 4):
+                if compute_angle_diff(lane_angle, ego_angle_abs) > (math.pi * 2 / 3):
                     invalid_lane_indices.append(lane_idx)
                     pred_score_processed[lane_idx] = - math.inf
 
