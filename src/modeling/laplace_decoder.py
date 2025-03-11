@@ -270,13 +270,16 @@ class GRUDecoder(nn.Module):
 
         future_frame_num = self.future_frame_num  # H
 
+        # TODO: only use during training (now move out of `if self.args.do_train` for debugging)
+        dense_lane_targets = torch.zeros([batch_size, future_frame_num], device=device, dtype=torch.long)
+        for i in range(batch_size):
+            dense_lane_targets[i, :] = torch.tensor(np.array(mapping[i]['dense_lane_labels']), dtype=torch.long,
+                                                    device=device)
+        dense_lane_targets = dense_lane_targets.view(-1)  # [N*H] - GT lane segment in each N*H frame
+
         if self.args.do_train:
             # compute L_lane loss (cross-entropy)
-            dense_lane_targets = torch.zeros([batch_size, future_frame_num], device=device, dtype=torch.long)
-            for i in range(batch_size):
-                dense_lane_targets[i, :] = torch.tensor(np.array(mapping[i]['dense_lane_labels']), dtype=torch.long, device=device)
             lane_loss_weight = self.args.lane_loss_weight  # \lambda_1
-            dense_lane_targets = dense_lane_targets.view(-1) # [N*H] - GT lane segment in each N*H frame
             loss += lane_loss_weight*F.nll_loss(dense_lane_pred, dense_lane_targets, reduction='none').\
                     view(batch_size, future_frame_num).sum(dim=1) # cross-entropy loss L_lane
 
