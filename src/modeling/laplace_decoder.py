@@ -200,7 +200,7 @@ class GRUDecoder(nn.Module):
             Returns: tensor of top k indices
             """
             # why can lane_meta be shorter than pred_score? => pred_score is computed from lane_states_batch (merged tensor)
-            assert pred_score.shape >= len(lane_meta)
+            assert pred_score.shape[0] >= len(lane_meta)
             pred_score_processed = torch.tensor(pred_score, device=device)
             ego_angle_abs = - (utils.get_from_mapping(mapping, 'angle')[batch_idx] - math.pi / 2)
 
