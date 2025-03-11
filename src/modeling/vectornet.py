@@ -165,6 +165,7 @@ class VectorNet(nn.Module):
         # print(f'[encoder] (1) agent_states_batch.shape: {agent_states_batch.shape}')
         # lane_states_batch.shape = [batch, max_lane_states_length, feature]
         #   max_lane_states_length (lengths_lane) varies between iterations
+        print(f'len(lane_states_batch): {len(lane_states_batch)}')
         for i in range(10):
             print(f'lane_states_batch[{i}].shape: {lane_states_batch[i].shape}')
         lane_states_batch, lengths_lane = utils.merge_tensors(lane_states_batch, device, args.hidden_size)
