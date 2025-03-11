@@ -220,58 +220,35 @@ class GRUDecoder(nn.Module):
 
             _, topk_indices = torch.topk(dense_lane_pred[i], k)
             _, valid_topk_indices = torch.topk(pred_score_processed, k)
-            sum_topk_indices = torch.exp(dense_lane_pred[i][topk_indices]).sum()
-            sum_valid_topk_indices = torch.exp(pred_score_processed[valid_topk_indices]).sum()
-            # print(f'topk_indices: {topk_indices}, sum(topk_indices): {sum_topk_indices}')
-            # print(f'valid_topk_indices: {valid_topk_indices}, sum(valid_topk_indices): {sum_valid_topk_indices}')
             if not torch.equal(topk_indices, valid_topk_indices):
-                # print('invalid ---------------------------------------')
-                instance_token = utils.get_from_mapping(mapping, 'file_name')[batch_idx]
-                sample_token = utils.get_from_mapping(mapping, 'sample_token')[batch_idx]
-                # print(f'instance_token: {instance_token}, sample_token: {sample_token}, ego_angle_abs: {ego_angle_abs}')
                 for lane_idx in topk_indices:
                     if lane_idx not in valid_topk_indices:
-                        lane_idx_in_topk_indices = torch.nonzero(topk_indices == lane_idx, as_tuple=True)[0].item()
-                        # print(f'top {lane_idx_in_topk_indices}, lane_meta[{lane_idx}]: {lane_meta[lane_idx]}')
                         self.invalid_lane_segment_in_topk_num += 1
 
             return valid_topk_indices
 
         max_vector_num = lane_states_batch.shape[1]
         batch_size = len(mapping)
-        # print(f'batch_size: {batch_size}')
-        # print('mapping[0].keys():')
-        # pprint(mapping[0].keys())
         src_attention_mask_lane = torch.zeros([batch_size, lane_states_batch.shape[1]], device=device) # [N, max_len]
         for i in range(batch_size):
             assert lane_states_length[i] > 0
             src_attention_mask_lane[i, :lane_states_length[i]] = 1
         src_attention_mask_lane = src_attention_mask_lane == 0
         lane_states_batch = lane_states_batch.permute(1, 0, 2) # [max_len, N, feature]
-        # print(f'lane_states_batch.shape: {lane_states_batch.shape}')
-        dense_lane_pred = compute_dense_lane_scores() # [max_len, N, H] - log(true_pred_score)
-        # print(f'(1) dense_lane_pred.shape: {dense_lane_pred.shape}')
-        dense_lane_pred = dense_lane_pred.permute(1, 0, 2) # [N, max_len, H]
-        # print(f'(2) dense_lane_pred.shape: {dense_lane_pred.shape}')
-        lane_states_batch = lane_states_batch.permute(1, 0, 2) # [N, max_len, feature]
-        dense_lane_pred =  dense_lane_pred.permute(0, 2, 1) # [N, H, max_len]
-        # print(f'(3) dense_lane_pred.shape: {dense_lane_pred.shape}')
-        dense_lane_pred = dense_lane_pred.contiguous().view(-1, max_vector_num)  # [N*H, max_len]
-        # print(f'(4) dense_lane_pred.shape: {dense_lane_pred.shape}')
 
         # dense_lane_pred: prediction about the probability of each lane segment index that the agent will go to
         #       ^ that's why size = [N*H, max_len] <= max_len is # lane segments
-        # dense_lane_targets: GT lane segment index
-        #   ^ index of what? => self.subdivided_lane_traj_rel
-        # TODO:
-        #   when we have lane segment index (dense_lane_pred index in dimension max_len),
-        #   can use this index to get the angle_abs -> relative angle to agent
-        #       How to map index -> angle_abs (or rel)?
-        #       => check log insrc/datascripts/dataloader_nuscenes.py:547
+        dense_lane_pred = compute_dense_lane_scores() # [max_len, N, H] - log(true_pred_score)
+        dense_lane_pred = dense_lane_pred.permute(1, 0, 2) # [N, max_len, H]
+        lane_states_batch = lane_states_batch.permute(1, 0, 2) # [N, max_len, feature]
+        dense_lane_pred =  dense_lane_pred.permute(0, 2, 1) # [N, H, max_len]
+        dense_lane_pred = dense_lane_pred.contiguous().view(-1, max_vector_num)  # [N*H, max_len]
 
         future_frame_num = self.future_frame_num  # H
 
         # TODO: only use during training (now move out of `if self.args.do_train` for debugging)
+        # dense_lane_targets: GT lane segment index
+        #   ^ index of what? => self.subdivided_lane_traj_rel
         dense_lane_targets = torch.zeros([batch_size, future_frame_num], device=device, dtype=torch.long)
         for i in range(batch_size):
             dense_lane_targets[i, :] = torch.tensor(np.array(mapping[i]['dense_lane_labels']), dtype=torch.long,
@@ -286,18 +263,13 @@ class GRUDecoder(nn.Module):
 
         mink = self.args.topk
         dense_lane_topk = torch.zeros((dense_lane_pred.shape[0], mink, self.hidden_size), device=device) # [N*H, mink, hidden_size]
-        # print(f'(1) dense_lane_topk.shape: {dense_lane_topk.shape}')
         dense_lane_topk_scores = torch.zeros((dense_lane_pred.shape[0], mink), device=device)   # [N*H, mink]
-        # print(f'dense_lane_topk_scores.shape: {dense_lane_topk_scores.shape}')
 
         subdivided_lane_to_lane_meta = utils.get_from_mapping(mapping, 'subdivided_lane_to_lane_meta')
 
         for i in range(dense_lane_topk_scores.shape[0]): # for each i in N*H (batch_size * future_frame_num)
             batch_idx = i // future_frame_num
             k = min(mink, lane_states_length[batch_idx])
-            # if i < 3:
-            #     print(f'dense_lane_pred[{i}]: {dense_lane_pred[i]}')
-            #     print(f'sum: {torch.exp(dense_lane_pred[i]).sum()}')
             # _, topk_idxs = torch.topk(dense_lane_pred[i], k) # select top k=2 (or 4) lane segments to guide decoder
             topk_idxs = top_k_indices()
             dense_lane_topk[i][:k] = lane_states_batch[batch_idx, topk_idxs] # [N*H, mink, hidden_size]
@@ -305,43 +277,12 @@ class GRUDecoder(nn.Module):
 
             self.lane_segment_in_topk_num += topk_idxs.size(0)
 
-            # topk_lane_meta = [subdivided_lane_to_lane_meta[batch_idx][index] for index in topk_idxs.tolist()]
-            #
-            # ego_angle_abs = - (utils.get_from_mapping(mapping, 'angle')[batch_idx] - math.pi / 2)
-            # for j, _ in enumerate(topk_idxs.tolist()):
-            #     lane_angle, _, layer = topk_lane_meta[j]
-            #     if layer == 'lane_connector':
-            #         continue
-            #     if compute_angle_diff(lane_angle, ego_angle_abs) > (math.pi * 2 / 3):
-            #         print(f'topk_lane_meta[j]: {topk_lane_meta[j]}, ego_angle_abs: {ego_angle_abs}')
-            #         ego_car_info = utils.get_from_mapping(mapping, 'ego_car_info')[batch_idx]
-            #         print(f'ego_car_info: {ego_car_info}')
-            #         self.angle_diff_num += 1
-
         print(f'prediction_num: {self.prediction_num}, gt_invalid_num: {self.gt_invalid_num}, % = {self.gt_invalid_num / self.prediction_num}')
         print(f'lane_segment_in_topk_num: {self.lane_segment_in_topk_num}, invalid_lane_segment_in_topk_num: {self.invalid_lane_segment_in_topk_num}, % = {self.invalid_lane_segment_in_topk_num / self.lane_segment_in_topk_num}')
 
-        # print(f'-------------------------------------------------')
-        # random_idxs = get_random_ints(batch_size, 10)
-        # for idx in random_idxs:
-        #     instance_token = utils.get_from_mapping(mapping, 'file_name')[idx]
-        #     sample_token = utils.get_from_mapping(mapping, 'sample_token')[idx]
-        #     city_name = utils.get_from_mapping(mapping, 'city_name')[idx]
-        #     angle = utils.get_from_mapping(mapping, 'angle')[idx]
-        #     print(f'instance_token: {instance_token}\nsample_token: {sample_token}\n'
-        #           f'city_name: {city_name}\nangle: {angle}\nactual angle: {- (angle - math.pi / 2)}')
-        #
-        #     print(f'random batch idx = {idx}, debug_topk: {debug_topk}')
-        #     for idx2 in range(idx * future_frame_num, (idx + 1) * future_frame_num):
-        #         print(f'    dense_lane_top{debug_topk}_scores: {dense_lane_topk_scores[idx2][:debug_topk]}')
-        #         print(f'    dense_lane_top{debug_topk}_lane_meta: {dense_lane_topk_lane_meta[idx2][:debug_topk]}')
-        # print(f'-------------------------------------------------')
-
         # obtain candidate lane encodings C = ConCat{c_{1:k}, s^_{1:k}}^{t_f}_{t=1}
         dense_lane_topk = torch.cat([dense_lane_topk, dense_lane_topk_scores.unsqueeze(-1)], dim=-1) # [N*H, mink, hidden_size + 1]
-        # print(f'(2) dense_lane_topk.shape: {dense_lane_topk.shape}')
         dense_lane_topk = dense_lane_topk.view(batch_size, future_frame_num*mink, self.hidden_size + 1) # [N, sense*mink, hidden_size + 1]
-        # print(f'(3) dense_lane_topk.shape: {dense_lane_topk.shape}')
         return dense_lane_topk # [N, H*mink, hidden_size + 1]
 
     def forward(self, mapping: List[Dict], batch_size, lane_states_batch, lane_states_length, inputs: Tensor,
