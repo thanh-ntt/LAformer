@@ -110,6 +110,8 @@ class GRUDecoder(nn.Module):
 
         self.lane_segment_in_topk_num = 0
         self.invalid_lane_segment_in_topk_num = 0
+        self.prediction_num = 0
+        self.gt_invalid_num = 0
 
     def dense_lane_aware(self, i, mapping: List[Dict], lane_states_batch, lane_states_length, element_hidden_states, \
                             element_hidden_states_lengths, global_hidden_states, device, loss):
@@ -191,30 +193,33 @@ class GRUDecoder(nn.Module):
             # print(f'(2) dense_lane_scores.shape: {dense_lane_scores.shape}')
             return dense_lane_scores # [seq_len, batch, future_steps] = [max_len, N, H]
 
-        def top_k_indices(pred_score, lane_meta, k) -> Tensor:
+        def top_k_indices() -> Tensor:
             """
             Get the top k indices in pred_score, (optional) apply penalty
-            Args:
-                pred_score [max_len]: predicted score of each lane segment
-                lane_meta [seq_len]: meta info of each lane segment
-            Returns: tensor of top k indices
             """
+            # i: index of dense_lane_pred and dense_lane_targets along 1st dimension - shape [N*H, max_len]
+            #     i in range (0, N*H)
+            # batch_idx = i // future_frame_num (H)
+
             # why can lane_meta be shorter than pred_score? => pred_score is computed from lane_states_batch (merged tensor)
-            assert pred_score.shape[0] >= len(lane_meta)
-            pred_score_processed = torch.tensor(pred_score, device=device)
+            assert dense_lane_pred[i].shape[0] >= len(subdivided_lane_to_lane_meta[batch_idx])
+
+            pred_score_processed = torch.tensor(dense_lane_pred[i], device=device)
             ego_angle_abs = - (utils.get_from_mapping(mapping, 'angle')[batch_idx] - math.pi / 2)
 
-            invalid_lane_indices = []
-            for lane_idx in range(0, len(lane_meta)):
-                lane_angle, _, layer = lane_meta[lane_idx]
+            self.prediction_num += 1
+            for lane_idx in range(0, len(subdivided_lane_to_lane_meta[batch_idx])):
+                lane_angle, _, layer = subdivided_lane_to_lane_meta[batch_idx][lane_idx]
                 # if layer == 'lane' and compute_angle_diff(lane_angle, ego_angle_abs) > (math.pi * 4 / 5):
                 if compute_angle_diff(lane_angle, ego_angle_abs) > (math.pi * 3 / 4):
-                    invalid_lane_indices.append(lane_idx)
                     pred_score_processed[lane_idx] = - math.inf
 
-            _, topk_indices = torch.topk(pred_score, k)
+                    if lane_idx == dense_lane_targets[i]:
+                        self.gt_invalid_num += 1
+
+            _, topk_indices = torch.topk(dense_lane_pred[i], k)
             _, valid_topk_indices = torch.topk(pred_score_processed, k)
-            sum_topk_indices = torch.exp(pred_score[topk_indices]).sum()
+            sum_topk_indices = torch.exp(dense_lane_pred[i][topk_indices]).sum()
             sum_valid_topk_indices = torch.exp(pred_score_processed[valid_topk_indices]).sum()
             # print(f'topk_indices: {topk_indices}, sum(topk_indices): {sum_topk_indices}')
             # print(f'valid_topk_indices: {valid_topk_indices}, sum(valid_topk_indices): {sum_valid_topk_indices}')
@@ -271,7 +276,7 @@ class GRUDecoder(nn.Module):
             for i in range(batch_size):
                 dense_lane_targets[i, :] = torch.tensor(np.array(mapping[i]['dense_lane_labels']), dtype=torch.long, device=device)
             lane_loss_weight = self.args.lane_loss_weight  # \lambda_1
-            dense_lane_targets = dense_lane_targets.view(-1) # [N*H]
+            dense_lane_targets = dense_lane_targets.view(-1) # [N*H] - GT lane segment in each N*H frame
             loss += lane_loss_weight*F.nll_loss(dense_lane_pred, dense_lane_targets, reduction='none').\
                     view(batch_size, future_frame_num).sum(dim=1) # cross-entropy loss L_lane
 
@@ -290,7 +295,7 @@ class GRUDecoder(nn.Module):
             #     print(f'dense_lane_pred[{i}]: {dense_lane_pred[i]}')
             #     print(f'sum: {torch.exp(dense_lane_pred[i]).sum()}')
             # _, topk_idxs = torch.topk(dense_lane_pred[i], k) # select top k=2 (or 4) lane segments to guide decoder
-            topk_idxs = top_k_indices(dense_lane_pred[i], subdivided_lane_to_lane_meta[batch_idx], k)
+            topk_idxs = top_k_indices()
             dense_lane_topk[i][:k] = lane_states_batch[batch_idx, topk_idxs] # [N*H, mink, hidden_size]
             dense_lane_topk_scores[i][:k] = dense_lane_pred[i][topk_idxs] # [N*H, mink]
 
@@ -309,6 +314,7 @@ class GRUDecoder(nn.Module):
             #         print(f'ego_car_info: {ego_car_info}')
             #         self.angle_diff_num += 1
 
+        print(f'prediction_num: {self.prediction_num}, gt_invalid_num: {self.gt_invalid_num}, % = {self.gt_invalid_num / self.prediction_num}')
         print(f'lane_segment_num: {self.lane_segment_in_topk_num}, angle_diff_num: {self.invalid_lane_segment_in_topk_num}, % = {self.invalid_lane_segment_in_topk_num / self.lane_segment_in_topk_num}')
 
         # print(f'-------------------------------------------------')
