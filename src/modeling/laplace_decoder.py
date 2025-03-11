@@ -214,7 +214,7 @@ class GRUDecoder(nn.Module):
                 if compute_angle_diff(lane_angle, ego_angle_abs) > (math.pi * 3 / 4):
                     pred_score_processed[lane_idx] = - math.inf
 
-                    if lane_idx == dense_lane_targets[i] and i % future_frame_num > 6:
+                    if lane_idx == dense_lane_targets[i] and i % future_frame_num < 6:
                         self.gt_invalid_num += 1
 
             _, topk_indices = torch.topk(dense_lane_pred[i], k)
