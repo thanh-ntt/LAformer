@@ -319,7 +319,7 @@ class GRUDecoder(nn.Module):
             #         self.angle_diff_num += 1
 
         print(f'prediction_num: {self.prediction_num}, gt_invalid_num: {self.gt_invalid_num}, % = {self.gt_invalid_num / self.prediction_num}')
-        print(f'lane_segment_num: {self.lane_segment_in_topk_num}, angle_diff_num: {self.invalid_lane_segment_in_topk_num}, % = {self.invalid_lane_segment_in_topk_num / self.lane_segment_in_topk_num}')
+        print(f'lane_segment_in_topk_num: {self.lane_segment_in_topk_num}, invalid_lane_segment_in_topk_num: {self.invalid_lane_segment_in_topk_num}, % = {self.invalid_lane_segment_in_topk_num / self.lane_segment_in_topk_num}')
 
         # print(f'-------------------------------------------------')
         # random_idxs = get_random_ints(batch_size, 10)
