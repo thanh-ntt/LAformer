@@ -644,26 +644,6 @@ def merge_tensors(tensors: List[torch.Tensor], device, hidden_size=None) -> Tupl
     # print("merge_tensor_lengths:" + str(lengths))
     return res, lengths
 
-
-def merge_tensors_lane(tensors: List[torch.Tensor],
-                       device,
-                       hidden_size=None) -> Tuple[Tensor, List[int]]:
-    """
-        temp version function to:
-        merge a list of tensors into a tensor, will merge to function : merge_tensors
-        so please see annotation of function : merge_tensors
-    """
-    lengths = []
-    hidden_size = args.hidden_size if hidden_size is None else hidden_size
-    for tensor in tensors:
-        lengths.append(tensor.shape[0] if tensor is not None else 0)
-    res = torch.zeros([len(tensors), max(lengths), hidden_size], device=device)
-    for i, tensor in enumerate(tensors):
-        if tensor is not None:
-            res[i][:tensor.shape[0]] = tensor
-    # print("merge_tensor_lengths:" + str(lengths))
-    return res, lengths
-
 def merge_tensors_loss(tensors: List[torch.Tensor], device, pred_length) -> Tuple[Tensor, List[int]]:
     """
     merge a list of tensors into a tensor

@@ -142,7 +142,7 @@ class VectorNet(nn.Module):
         # point level sub graph in batch
         device = all_agent_lists[0].device
         all_agent_lists, lengths = utils.merge_tensors(all_agent_lists, device, args.vector_size)
-        all_lane_lists, lengths_lane = utils.merge_tensors_lane(all_lane_lists, device, args.vector_size)
+        all_lane_lists, lengths_lane = utils.merge_tensors(all_lane_lists, device, args.vector_size)
         all_agent_states_unspilited, _ = self.point_level_sub_graph(all_agent_lists, lengths)
         all_lane_states_unspilited, _ = self.point_level_sub_graph_lane(all_lane_lists, lengths_lane)
         # Run laneGCN, get element states and lane_states
@@ -165,8 +165,10 @@ class VectorNet(nn.Module):
         # print(f'[encoder] (1) agent_states_batch.shape: {agent_states_batch.shape}')
         # lane_states_batch.shape = [batch, max_lane_states_length, feature]
         #   max_lane_states_length (lengths_lane) varies between iterations
-        lane_states_batch, lengths_lane = utils.merge_tensors_lane(lane_states_batch, device, args.hidden_size)
-        print(f'[encoder] (1) lane_states_batch.shape[1]: {lane_states_batch.shape[1]}')
+        for i in range(10):
+            print(f'lane_states_batch[{i}].shape: {lane_states_batch[i].shape}')
+        lane_states_batch, lengths_lane = utils.merge_tensors(lane_states_batch, device, args.hidden_size)
+        print(f'[encoder] (1) lane_states_batch.shape: {lane_states_batch.shape}')
         print(f'[encoder] lengths_lane: {lengths_lane}')
         src_attention_mask_lane = torch.zeros([batch_size, lane_states_batch.shape[1]], device=device)
         src_attention_mask_agent = torch.zeros([batch_size, agent_states_batch.shape[1]], device=device)
