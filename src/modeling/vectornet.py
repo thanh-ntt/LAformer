@@ -166,7 +166,8 @@ class VectorNet(nn.Module):
         # lane_states_batch.shape = [batch, max_lane_states_length, feature]
         #   max_lane_states_length (lengths_lane) varies between iterations
         lane_states_batch, lengths_lane = utils.merge_tensors_lane(lane_states_batch, device, args.hidden_size)
-        # print(f'[encoder] (1) lane_states_batch.shape: {lane_states_batch.shape}')
+        print(f'[encoder] (1) lane_states_batch.shape: {lane_states_batch.shape}')
+        print(f'[encoder] lengths_lane: {lengths_lane}')
         src_attention_mask_lane = torch.zeros([batch_size, lane_states_batch.shape[1]], device=device)
         src_attention_mask_agent = torch.zeros([batch_size, agent_states_batch.shape[1]], device=device)
         for i in range(batch_size):

@@ -192,8 +192,17 @@ class GRUDecoder(nn.Module):
             return dense_lane_scores # [seq_len, batch, future_steps] = [max_len, N, H]
 
         def top_k_indices(pred_score, lane_meta, k) -> Tensor:
+            """
+            Get the top k indices in pred_score, (optional) apply penalty
+            Args:
+                pred_score [max_len]: predicted score of each lane segment
+                lane_meta [seq_len]: meta info of each lane segment
+            Returns: tensor of top k indices
+            """
             # print(f'pred_score.shape: {pred_score.shape}')
             # print(f'len(lane_meta): {len(lane_meta)}')
+
+            # TODO: why lane_meta is shorter than pred_score? => confirm this doesn't cause any miscalculation
             # assert pred_score.shape[0] == len(lane_meta)
             pred_score_processed = torch.tensor(pred_score, device=device)
             ego_angle_abs = - (utils.get_from_mapping(mapping, 'angle')[batch_idx] - math.pi / 2)
