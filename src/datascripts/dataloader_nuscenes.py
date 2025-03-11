@@ -797,7 +797,7 @@ class NuScenesData(SingleAgentDataset):
         i = 0
         print_count = 0
         for lane_token, lane_poses in lanes.items():
-            # TODO: add this back if error
+            # TODO: verify this doesn't affect performance (as we may encode additional lane's direction)
             # li = [np.array([coord[0], coord[1]]) for coord in li]
             if len(lane_poses) > 1:
                 self.lanes_midline_abs.append(lane_poses)

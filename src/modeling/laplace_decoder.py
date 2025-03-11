@@ -140,11 +140,6 @@ class GRUDecoder(nn.Module):
         Returns:
             tensor: candidate lane encodings C = ConCat{c_{1:k}, s^_{1:k}}^{t_f}_{t=1}
         """
-        # print(f'lane_states_batch.shape: {lane_states_batch.shape}')
-        # print(f'len(lane_states_length): {len(lane_states_length)}')
-        # print(f'lane_states_length: {lane_states_length}')
-        # print(f'element_hidden_states.shape: {element_hidden_states.shape}')
-        # print(f'global_hidden_states.shape: {global_hidden_states.shape}')
         def compute_dense_lane_scores():
             """predict score of the j-th lane segment at future time step t
 
