@@ -227,6 +227,9 @@ class NuScenesData(SingleAgentDataset):
         self.data_per_core = int(self.data_num / self.args['cores']) + 1
         self.buffer_size = 50
 
+        self.data_num = 0
+        self.high_velocity_num = 0
+
     def __len__(self):
         """
         Size of dataset
@@ -572,10 +575,12 @@ class NuScenesData(SingleAgentDataset):
         """
         update self.mapping dict
         """
+        self.data_num += 1
         v = self.helper.get_velocity_for_agent(self.instance_token, self.sample_token)
         # velocity = self.ego_past_traj_rel_[:, 4, 0]
         if v > 5.5:
-            print(f'v: {v}, self.ego_past_traj_rel[-1, 2] = {self.ego_past_traj_rel[-1, 2]}')
+            self.high_velocity_num += 1
+            print(f'v: {v}, self.ego_past_traj_rel[-1, 2] = {self.ego_past_traj_rel[-1, 2]}, self.data_num: {self.data_num}, self.high_velocity_num: {self.high_velocity_num}')
         self.mapping.update(
             file_name = self.instance_token,
             sample_token = self.sample_token,
