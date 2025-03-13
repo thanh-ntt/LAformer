@@ -416,7 +416,6 @@ class NuScenesData(SingleAgentDataset):
         self.start_time = self.timestamps[0]
 
         motion_states = self.get_past_motion_states(self.instance_token, self.sample_token)
-        print(f'motion_states[-1, 0]: {motion_states[-1, 0]}')
         self.ego_past_traj_abs_, self.ego_past_traj_rel_ = np.zeros((2 * self.args['t_h']+1, 5)), np.zeros((2 * self.args['t_h']+1, 5))
         if self.rf_is_observed:
             self.ego_past_traj_abs = list(self.ego_past_traj_abs)
@@ -428,8 +427,6 @@ class NuScenesData(SingleAgentDataset):
             self.ego_past_traj_rel_[:,:2] = np.array(self.ego_past_traj_rel)
             self.ego_past_traj_rel_[:, 2:] = motion_states
             self.ego_past_traj_abs, self.ego_past_traj_rel =  self.ego_past_traj_abs_, self.ego_past_traj_rel_
-
-        print(f'self.ego_past_traj_rel[-1, 2]: {self.ego_past_traj_rel[-1, 2]}')
         return 0
 
     def encode_lanes(self, idx: int) -> int:
@@ -577,7 +574,8 @@ class NuScenesData(SingleAgentDataset):
         """
         v = self.helper.get_velocity_for_agent(self.instance_token, self.sample_token)
         # velocity = self.ego_past_traj_rel_[:, 4, 0]
-        print(f'v: {v}, self.ego_past_traj_rel[-1, 2] = {self.ego_past_traj_rel[-1, 2]}')
+        if v > 5.5:
+            print(f'v: {v}, self.ego_past_traj_rel[-1, 2] = {self.ego_past_traj_rel[-1, 2]}')
         self.mapping.update(
             file_name = self.instance_token,
             sample_token = self.sample_token,
