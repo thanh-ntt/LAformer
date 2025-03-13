@@ -215,7 +215,7 @@ class NuScenesData(SingleAgentDataset):
         #
         #   1 test case in challenge = 1 agent at a particular timestamp for an instance
         self.token_list = get_prediction_challenge_split(self.args['split'], dataroot=self.helper.data.dataroot)
-        # print(f"# agents in the current split: len(self.token_list): {len(self.token_list)}")
+        print(f"length of data: {len(self.token_list)}") # number of agents in the current split
 
         # Past and prediction horizons
 
@@ -797,7 +797,7 @@ class NuScenesData(SingleAgentDataset):
         i = 0
         print_count = 0
         for lane_token, lane_poses in lanes.items():
-            # TODO: verify this doesn't affect performance (as we may encode additional lane's direction)
+            # (Done) verified commenting this doesn't affect the result (same pre-processed data used by LAformer)
             # li = [np.array([coord[0], coord[1]]) for coord in li]
             if len(lane_poses) > 1:
                 self.lanes_midline_abs.append(lane_poses)
