@@ -425,7 +425,7 @@ class NuScenesData(SingleAgentDataset):
             self.ego_past_traj_rel = list(self.ego_past_traj_rel)
             self.ego_past_traj_rel.append(np.array([0, 0]))
             self.ego_past_traj_rel_[:,:2] = np.array(self.ego_past_traj_rel)
-            self.ego_past_traj_rel_[:, 2:] = motion_states
+            self.ego_past_traj_rel_[:, 2:] = motion_states # velocity = self.ego_past_traj_rel_[:, 4, 0]
             self.ego_past_traj_abs, self.ego_past_traj_rel =  self.ego_past_traj_abs_, self.ego_past_traj_rel_ 
         return 0
 
@@ -572,6 +572,8 @@ class NuScenesData(SingleAgentDataset):
         """
         update self.mapping dict
         """
+        v = self.helper.get_velocity_for_agent(self.instance_token, self.sample_token)
+        print(f'v: {v}, self.ego_past_traj_rel[{self.idx}] = {self.ego_past_traj_rel[self.idx]}')
         self.mapping.update(
             file_name = self.instance_token,
             sample_token = self.sample_token,
