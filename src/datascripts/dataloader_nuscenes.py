@@ -574,7 +574,7 @@ class NuScenesData(SingleAgentDataset):
         """
         v = self.helper.get_velocity_for_agent(self.instance_token, self.sample_token)
         # velocity = self.ego_past_traj_rel_[:, 4, 0]
-        print(f'v: {v}, self.ego_past_traj_rel[{self.idx}] = {self.ego_past_traj_rel[self.idx, 4, 0]}')
+        print(f'v: {v}, self.ego_past_traj_rel[4, 0] = {self.ego_past_traj_rel[4, 0]}')
         self.mapping.update(
             file_name = self.instance_token,
             sample_token = self.sample_token,
