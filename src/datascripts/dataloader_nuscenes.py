@@ -797,7 +797,8 @@ class NuScenesData(SingleAgentDataset):
         i = 0
         print_count = 0
         for lane_token, lane_poses in lanes.items():
-            # (Done) verified commenting this doesn't affect the result (same pre-processed data used by LAformer)
+            # (Done) verified commenting this doesn't affect the result:
+            #   preprocessed data v4 give same result for LAformer and LAformer_original
             # li = [np.array([coord[0], coord[1]]) for coord in li]
             if len(lane_poses) > 1:
                 self.lanes_midline_abs.append(lane_poses)
