@@ -208,8 +208,11 @@ class GRUDecoder(nn.Module):
                 # if layer == 'lane' and compute_angle_diff(lane_angle, ego_angle_abs) > (math.pi * 4 / 5):
                 velocity = utils.get_from_mapping(mapping, 'past_traj')[batch_idx][-1, 2]
                 print(f'velocity: {velocity}')
-                if compute_angle_diff(lane_angle, ego_angle_abs) > (math.pi * 3 / 4):
-                    # i % future_frame_num < 4: only consider the first 4 future frames to avoid cases like U-turn
+                # if compute_angle_diff(lane_angle, ego_angle_abs) > (math.pi * 3 / 4):
+                # if compute_angle_diff(lane_angle, ego_angle_abs) > (math.pi * 3 / 4)
+                #       and i % future_frame_num < 4:
+                if (compute_angle_diff(lane_angle, ego_angle_abs) > (math.pi * 3 / 4)
+                        and i % future_frame_num < 4 and velocity > 4.167):
                     pred_score_processed[lane_idx] = - math.inf
 
                     if lane_idx == dense_lane_targets[i]:
