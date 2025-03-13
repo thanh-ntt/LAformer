@@ -206,7 +206,7 @@ class GRUDecoder(nn.Module):
             for lane_idx in range(0, len(subdivided_lane_to_lane_meta[batch_idx])):
                 lane_angle, _, layer = subdivided_lane_to_lane_meta[batch_idx][lane_idx]
                 # if layer == 'lane' and compute_angle_diff(lane_angle, ego_angle_abs) > (math.pi * 4 / 5):
-                velocity = utils.get_from_mapping(mapping, 'past_traj')[batch_idx, -1, 2]
+                velocity = utils.get_from_mapping(mapping, 'past_traj')[batch_idx][-1, 2]
                 print(f'velocity: {velocity}')
                 if compute_angle_diff(lane_angle, ego_angle_abs) > (math.pi * 3 / 4):
                     # i % future_frame_num < 4: only consider the first 4 future frames to avoid cases like U-turn
