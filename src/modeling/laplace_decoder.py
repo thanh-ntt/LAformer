@@ -207,11 +207,11 @@ class GRUDecoder(nn.Module):
                 lane_angle, _, layer = subdivided_lane_to_lane_meta[batch_idx][lane_idx]
                 # if layer == 'lane' and compute_angle_diff(lane_angle, ego_angle_abs) > (math.pi * 4 / 5):
                 # velocity = utils.get_from_mapping(mapping, 'past_traj')[batch_idx][-1, 2]
-                if compute_angle_diff(lane_angle, ego_angle_abs) > (math.pi * 3 / 4):
-                # if compute_angle_diff(lane_angle, ego_angle_abs) > (math.pi * 3 / 4) and i % future_frame_num < 4:
+                # if compute_angle_diff(lane_angle, ego_angle_abs) > (math.pi * 3 / 4):
+                if compute_angle_diff(lane_angle, ego_angle_abs) > (math.pi * 3 / 4) and i % future_frame_num < 4:
                 # if (compute_angle_diff(lane_angle, ego_angle_abs) > (math.pi * 3 / 4)
                 #         and i % future_frame_num < 4 and velocity > 4.167):
-                #     pred_score_processed[lane_idx] = - math.inf
+                    pred_score_processed[lane_idx] = - math.inf
 
                     if lane_idx == dense_lane_targets[i]:
                         self.gt_invalid_num += 1
