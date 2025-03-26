@@ -113,20 +113,20 @@ class GRUDecoder(nn.Module):
         self.prediction_num = 0
         self.gt_invalid_num = 0
 
-    def dense_lane_aware(self, i, mapping: List[Dict], lane_states_batch, lane_states_length, element_hidden_states, \
-                            element_hidden_states_lengths, global_hidden_states, device, loss):
+    def dense_lane_aware(self, i, mapping: List[Dict], lane_features, lane_states_length, element_hidden_states, \
+                         global_embed, device, loss):
         """future_frame_num lane aware
         Args:
             mapping (list): data mapping
-            lane_states_batch (tensor): hidden states of lanes
+            lane_features (tensor): hidden states of lanes (lane encoding c_j)
                 shape [batch, seq_len, feature]
             lane_states_length (list): lengths of the lane-state lists for each batch (max_lane_states_length)
                 len = batch
                 all elements in lane_states_length are the same = lane_states_batch.shape[1] = seq_len
             element_hidden_states (tensor): [batch, feature]
-            global_hidden_states (tensor): [batch, feature]
-                global_hidden_states is the output of the Global Interaction Graph
-                global_hidden_states contains both agent & lane states
+            global_embed (tensor): [batch, feature]
+                global_embed is the output of the Global Interaction Graph
+                global_embed contains both agent & lane states
                 ^ check model_main.py's forward fn
                     GlobalGraph has nn.Linear for all K,Q,V => linear projection
 
@@ -142,6 +142,7 @@ class GRUDecoder(nn.Module):
         """
         def compute_dense_lane_scores():
             """predict score of the j-th lane segment at future time step t
+            TODO: loss re-weighting
 
                 Question: Why does compute_dense_lane_scores() return Tensor shape [seq_len, N, H]?
                     This fn returns a scalar (predicted score) of j-th lane segment at time step t
@@ -156,33 +157,35 @@ class GRUDecoder(nn.Module):
                     seq_len (max_lane_states_length) varies between iterations
                     future_steps: t_f (in section 3.3)
             """
-            # self.dense_label_cross_attention: scaled dot product attention block
+            # Scaled dot product attention block
             # h_{i,att}: global_embed_att = cross_attention(Q: h_i, K,V: C)
-            # Q: lane_states_batch = lane encoding c_j
+            # Q: lane_features = lane encoding c_j
             # K, V: element_hidden_states = agent motion encoding h_i
             # A_{i,j} = softmax(...) = Scaled Dot Product Attention (K,V,Q above)
-            # TODO: where are the linear projections (of both K,V and Q)?
+            # Question: where are the linear projections (of both K,V and Q)?
+            #   => inside nn.TransformerDecoderLayer (it's already in the original "Attention is all you need!" paper)
+            # lane_encoding_batch.shape = [max_len, N, feature]
             # lane_states_batch_attention.shape = [max_num_lanes, batch_size, hidden_size]
             # TODO: why the element-wise addiction '+'?
-            lane_states_batch_attention = lane_states_batch + self.dense_label_cross_attention(
-                lane_states_batch, element_hidden_states.unsqueeze(0), tgt_key_padding_mask=src_attention_mask_lane)
+            lane_states_batch_attention = lane_features + self.dense_label_cross_attention(
+                lane_features, element_hidden_states.unsqueeze(0), tgt_key_padding_mask=src_attention_mask_lane)
             # print(f'lane_states_batch_attention.shape: {lane_states_batch_attention.shape}')
 
-            # self.dense_lane_decoder: \theta = 2-layer MLP to process:
+            # \theta = 2-layer MLP to process:
             #   1. h_i: agent motion encoding
             #       Why need `expand(lane_states_batch.shape), lane_states_batch, lane_states_batch_attention], dim=-1)`?
-            #       => To re-shape global_hidden_states into lane_states_batch.shape
+            #       => To re-shape global_embed into lane_states_batch.shape
             #           ^ for concatenation operation `torch.cat`
             #   2. c_j: lane_states_batch: hidden states of lanes (lane encoding)
             #   3. A_{i,j}: lane_states_batch_attention: the predicted score of the j-th lane segment at t
             #
             # dense_lane_scores.shape = [max_num_lanes, batch_size, t_f]
             #   t_f: future_steps / future_frame_num (default value = 12)
-            dense_lane_scores = self.dense_lane_decoder(torch.cat([global_hidden_states.unsqueeze(0).expand(
-                lane_states_batch.shape), lane_states_batch, lane_states_batch_attention], dim=-1)) # [max_len, N, H]
+            dense_lane_scores = self.dense_lane_decoder(torch.cat([global_embed.unsqueeze(0).expand(
+                lane_features.shape), lane_features, lane_states_batch_attention], dim=-1)) # [max_len, N, H]
             # print(f'(1) dense_lane_scores.shape: {dense_lane_scores.shape}')
 
-            # lane-scoring head
+            # Lane-scoring head
             # s^_{j,t} = softmax(\theta{ h_i, c_j, A_{i,j} }) <= this does not change shape of the tensor
             dense_lane_scores = F.log_softmax(dense_lane_scores, dim=0)
             # print(f'(2) dense_lane_scores.shape: {dense_lane_scores.shape}')
@@ -225,20 +228,20 @@ class GRUDecoder(nn.Module):
 
             return valid_topk_indices
 
-        max_vector_num = lane_states_batch.shape[1]
+        max_vector_num = lane_features.shape[1]
         batch_size = len(mapping)
-        src_attention_mask_lane = torch.zeros([batch_size, lane_states_batch.shape[1]], device=device) # [N, max_len]
+        src_attention_mask_lane = torch.zeros([batch_size, lane_features.shape[1]], device=device) # [N, max_len]
         for i in range(batch_size):
             assert lane_states_length[i] > 0
             src_attention_mask_lane[i, :lane_states_length[i]] = 1
         src_attention_mask_lane = src_attention_mask_lane == 0
-        lane_states_batch = lane_states_batch.permute(1, 0, 2) # [max_len, N, feature]
+        lane_features = lane_features.permute(1, 0, 2) # [max_len, N, feature]
 
         # dense_lane_pred: prediction about the probability of each lane segment index that the agent will go to
         #       ^ that's why size = [N*H, max_len] <= max_len is # lane segments
         dense_lane_pred = compute_dense_lane_scores() # [max_len, N, H] - log(true_pred_score)
         dense_lane_pred = dense_lane_pred.permute(1, 0, 2) # [N, max_len, H]
-        lane_states_batch = lane_states_batch.permute(1, 0, 2) # [N, max_len, feature]
+        lane_features = lane_features.permute(1, 0, 2) # [N, max_len, feature]
         dense_lane_pred =  dense_lane_pred.permute(0, 2, 1) # [N, H, max_len]
         dense_lane_pred = dense_lane_pred.contiguous().view(-1, max_vector_num)  # [N*H, max_len]
 
@@ -270,7 +273,7 @@ class GRUDecoder(nn.Module):
             k = min(mink, lane_states_length[batch_idx])
             # _, topk_idxs = torch.topk(dense_lane_pred[i], k) # select top k=2 (or 4) lane segments to guide decoder
             topk_idxs = top_k_indices()
-            dense_lane_topk[i][:k] = lane_states_batch[batch_idx, topk_idxs] # [N*H, mink, hidden_size]
+            dense_lane_topk[i][:k] = lane_features[batch_idx, topk_idxs] # [N*H, mink, hidden_size]
             dense_lane_topk_scores[i][:k] = dense_lane_pred[i][topk_idxs] # [N*H, mink]
 
             self.lane_segment_in_topk_num += topk_idxs.size(0)
@@ -283,11 +286,11 @@ class GRUDecoder(nn.Module):
         dense_lane_topk = dense_lane_topk.view(batch_size, future_frame_num*mink, self.hidden_size + 1) # [N, sense*mink, hidden_size + 1]
         return dense_lane_topk # [N, H*mink, hidden_size + 1]
 
-    def forward(self, mapping: List[Dict], batch_size, lane_states_batch, lane_states_length, inputs: Tensor,
-                inputs_lengths: List[int], hidden_states: Tensor, device) -> Tuple[torch.Tensor, torch.Tensor]:
+    def forward(self, mapping: List[Dict], batch_size, lanes_embed, lane_states_length, agents_embed: Tensor,
+                global_embed: Tensor, device) -> Tuple[torch.Tensor, torch.Tensor]:
         """lane-aware estimation + multimodal conditional decoder
         Args:
-            lane_states_batch: hidden states of lanes
+            lanes_embed: hidden states of lanes
                 [batch, lane_seq_len, feature]
                     batch: train_batch_size
                     lane_seq_len: max_lane_states_length
@@ -295,7 +298,7 @@ class GRUDecoder(nn.Module):
                 ^ c_j
                 This is not encoded by global graph
 
-            inputs: hidden states of agents before encoding by global graph
+            agents_embed: hidden states of agents before encoding by global graph
                 [batch, seq_len, feature]
                     batch: train_batch_size
                     seq_len: max_agent_states_length + max_lane_states_length
@@ -307,7 +310,7 @@ class GRUDecoder(nn.Module):
                         Afterward, the GIG further explores self-attention and skip-connection to learn the interactions among agents.
                         Namely, h_i = ConCat[h_i, c_j] for j ∈ {1, ..., N_lane}
 
-            hidden_states: hidden states of agents after encoding by global graph
+            global_embed: hidden states (embedding) of agent & lane after Global Interaction Graph (GIG)
                 [batch, seq_len, feature]
                     batch: train_batch_size
                     seq_len: max_agent_states_length + max_lane_states_length
@@ -329,11 +332,12 @@ class GRUDecoder(nn.Module):
         loss = torch.zeros(batch_size, device=device)
         DE = np.zeros([batch_size, self.future_steps])
         # TODO: why the decoder only cares about the embedding of the 1st sequence in inputs & hidden_states?
-        local_embed = inputs[:, 0, :]  # [batch_size, hidden_size]
-        global_embed = hidden_states[:, 0, :] # [batch_size, hidden_size]
+        #   (?) seems like it discard all previous time steps?
+        local_embed = agents_embed[:, 0, :]  # [batch_size, hidden_size]
+        global_embed = global_embed[:, 0, :] # [batch_size, hidden_size]
         if "step_lane_score" in self.args.other_params:
             dense_lane_topk = self.dense_lane_aware\
-            (0, mapping, lane_states_batch, lane_states_length, local_embed, inputs_lengths, global_embed, device, loss) # [N, dense*mink, hidden_size + 1]
+            (0, mapping, lanes_embed, lane_states_length, local_embed, global_embed, device, loss) # [N, dense*mink, hidden_size + 1]
             dense_lane_topk = dense_lane_topk.permute(1, 0, 2)  # [dense*mink, N, hidden_size + 1]
             # TODO: (paper) "and the candidate lane encodings C as the key and value vectors" => Why need projection proj_topk?
             dense_lane_topk = self.proj_topk(dense_lane_topk) # [dense*mink, N, hidden_size]
@@ -352,6 +356,8 @@ class GRUDecoder(nn.Module):
         global_embed = global_embed.reshape(-1, self.input_size)  # [F x N, D]
 
         z_size = self.z_size
+        # the latent vector z sampled from a multivariate normal distribution, served as an additional inputs
+        #   => why need this z? => to model the multi-modal distribution of the output trajectories
         z = torch.randn(self.num_modes*batch_size,  z_size, device=device) # [F*N, 5]
         global_embed = torch.cat([global_embed, z], dim=-1)  # [F x N, D+z_size]
         global_embed = self.aggregate_global_z(global_embed)  # [F x N, D]

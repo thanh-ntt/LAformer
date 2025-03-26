@@ -41,7 +41,9 @@ class MLP(nn.Module):
         return hidden_states
 
 class PointLevelSubGraph(nn.Module):
-
+    """
+    Extract spatial-temporal features from the polyline subgraph (PointNet-like) with MLP + GRU
+    """
     def __init__(self, hidden_size, depth=None):
         super(PointLevelSubGraph, self).__init__()
         if depth is None:
@@ -108,18 +110,32 @@ class VectorNet(nn.Module):
             num_layers = 3
 
         decoder_layer_A2L = nn.TransformerDecoderLayer(d_model=hidden_size, nhead=8, dim_feedforward=hidden_size)
+        # Question: is this related to LaneGCN model in "Learning Lane Graph Representations for Motion Forecasting"?
         self.laneGCN_A2L = nn.TransformerDecoder(decoder_layer_A2L, num_layers=num_layers)
         decoder_layer_L2A = nn.TransformerDecoderLayer(d_model=hidden_size, nhead=8, dim_feedforward=hidden_size)
         self.laneGCN_L2A = nn.TransformerDecoder(decoder_layer_L2A, num_layers=num_layers)
 
     def forward(self, mapping: List[Dict], matrix: List[np.ndarray], polyline_spans: List[List[slice]],
-                                 device, batch_size) -> Tuple[List[Tensor], List[Tensor]]:
+                                 device, batch_size) -> Tuple[List[Tensor], Tensor]:
         """
-        :param matrix: each value in list is vectors of all element (shape [-1, 128])
-        :param polyline_spans: vectors of i_th element is matrix[polyline_spans[i]]
-        :return: hidden states of all elements and hidden states of lanes
+        2 steps to get agents & lanes encoding:
+            - Use MLP & GRU to encode polyline subgraph
+            - Use cross-attention (Agent2Lane, Lane2Agent)
+                (Note: self-attention part of GIG is in model_main.py)
+
+        Args:
+            mapping (List[Dict]): pre-processed input data for all examples in the batch.
+            matrix (List[np.ndarray]): each value in list is vectors of all element (shape [-1, 128])
+            polyline_spans (List[List[slice]]): vectors of i_th element is matrix[polyline_spans[i]]
+            device (torch.device): The device on which the tensors should be processed.
+            batch_size (int): The number of elements in the batch.
+
+        Returns:
+            Tuple[List[Tensor], List[Tensor]]: A tuple containing:
+                - agents_lanes_embed (List[Tensor]): hidden states of all elements (agents and lanes) for each batch element.
+                - lanes_embed (List[Tensor]): hidden states of lanes for each batch element.
         """
-        # get agent and lane tensor list
+        # Convert input lists to tensors
         all_agent_lists, all_lane_lists, batch_split_agent, batch_split_lane = [], [], [], []
         start_lane, end_lane = 0, 0
         start_agent, end_agent = 0, 0
@@ -139,20 +155,23 @@ class VectorNet(nn.Module):
             end_lane += len(polyline_spans[i]) - map_start_polyline_idx
             batch_split_lane.append([start_lane, end_lane])
             start_lane = end_lane
-        # point level sub graph in batch
         device = all_agent_lists[0].device
         all_agent_lists, lengths = utils.merge_tensors(all_agent_lists, device, args.vector_size)
         all_lane_lists, lengths_lane = utils.merge_tensors(all_lane_lists, device, args.vector_size)
-        all_agent_states_unspilited, _ = self.point_level_sub_graph(all_agent_lists, lengths)
-        all_lane_states_unspilited, _ = self.point_level_sub_graph_lane(all_lane_lists, lengths_lane)
+
+        # get agents_polyline_embed & lanes_polyline_embed embedding from polyline sub-graph using MLP & GRU sequentially
+        # Question: how does a single PointLevelSubGraph encode ALL agents?
+        agents_polyline_embed_unsplit, _ = self.point_level_sub_graph(all_agent_lists, lengths) # h_i
+        lanes_polyline_embed_unsplit, _ = self.point_level_sub_graph_lane(all_lane_lists, lengths_lane) # c_j
+
         # Run laneGCN, get element states and lane_states
         agent_states_batch, lane_states_batch = [], [] # len(agent_states_batch) = len(lane_states_batch) = batch
         for i in range(batch_size):
             map_start_polyline_idx = mapping[i]['map_start_polyline_idx']
-            agents = all_agent_states_unspilited[batch_split_agent[i][0]:batch_split_agent[i][1]]
-            lanes = all_lane_states_unspilited[batch_split_lane[i][0]:batch_split_lane[i][1]]
-            agent_states_batch.append(agents)
-            lane_states_batch.append(lanes)
+            agents_polyline_embed = agents_polyline_embed_unsplit[batch_split_agent[i][0]:batch_split_agent[i][1]]
+            lanes_polyline_embed = lanes_polyline_embed_unsplit[batch_split_lane[i][0]:batch_split_lane[i][1]]
+            agent_states_batch.append(agents_polyline_embed)
+            lane_states_batch.append(lanes_polyline_embed)
         # print(f'[encoder] len(agent_states_batch): {len(agent_states_batch)}')
         # print(f'[encoder] agent_states_batch[0].shape: {agent_states_batch[0].shape}') # [4, 64] <= different value in different iterations
         # print(f'[encoder] agent_states_batch[1].shape: {agent_states_batch[1].shape}') # [27, 64] <= different value in different iterations
@@ -181,27 +200,29 @@ class VectorNet(nn.Module):
         src_attention_mask_lane = src_attention_mask_lane == 0
         src_attention_mask_agent = src_attention_mask_agent == 0
         lane_states_batch = lane_states_batch.permute(1, 0, 2)  # [seq_len, batch, feature]
-        agent_states_batch = agent_states_batch.permute(1, 0, 2)  # [seq_len, batch, feature]   
-        lane_states_batch = lane_states_batch + self.laneGCN_A2L(lane_states_batch, agent_states_batch, \
+        agent_states_batch = agent_states_batch.permute(1, 0, 2)  # [seq_len, batch, feature]
+        # Agent2Lane
+        lanes_embed = lane_states_batch + self.laneGCN_A2L(lane_states_batch, agent_states_batch, \
                                             memory_key_padding_mask=src_attention_mask_agent, tgt_key_padding_mask=src_attention_mask_lane)
-        agent_states_batch = agent_states_batch+ self.laneGCN_L2A(agent_states_batch, lane_states_batch, \
+        # Lane2Agent (also use lanes_embed)
+        agents_embed = agent_states_batch + self.laneGCN_L2A(agent_states_batch, lanes_embed, \
                                             memory_key_padding_mask=src_attention_mask_lane, tgt_key_padding_mask=src_attention_mask_agent)
-        agent_states_batch = agent_states_batch.permute(1, 0, 2)  # [batch, seq_len, feature]
-        # print(f'[encoder] (2) agent_states_batch.shape: {agent_states_batch.shape}')
-        lane_states_batch = lane_states_batch.permute(1, 0, 2)  # [batch, seq_len, feature]
-        # print(f'[encoder] (2) lane_states_batch.shape: {lane_states_batch.shape}')
-        element_states_batch = []
+        agents_embed = agents_embed.permute(1, 0, 2)  # [batch, seq_len, feature]
+        # print(f'[encoder] (2) agents_embed.shape: {agents_embed.shape}')
+        lanes_embed = lanes_embed.permute(1, 0, 2)  # [batch, seq_len, feature]
+        # print(f'[encoder] (2) lanes_embed.shape: {lanes_embed.shape}')
+        agents_lanes_embed = []
         for i in range(batch_size):
-            element_states_batch.append(torch.cat([agent_states_batch[i], lane_states_batch[i]], dim=0))
-        # print(f'[encoder] len(element_states_batch): {len(element_states_batch)}')
-        # print(f'[encoder] element_states_batch[0].shape: {element_states_batch[0].shape}') # <= different value in different iterations
-        # print(f'[encoder] element_states_batch[1].shape: {element_states_batch[1].shape}') # <= different value in different iterations
-        # print(f'[encoder] lane_states_batch.shape: {lane_states_batch.shape}')
-        # print(f'[encoder] lane_states_batch.shape[1]: {lane_states_batch.shape[1]}')
-        # len(element_states_batch) = batch
-        #   element_states_batch[i].shape = [max_agent_states_length + max_lane_states_length, feature]
-        # lane_states_batch.shape = [batch, max_lane_states_length, feature]
+            agents_lanes_embed.append(torch.cat([agents_embed[i], lanes_embed[i]], dim=0))
+        # print(f'[encoder] len(agents_lanes_embed): {len(agents_lanes_embed)}')
+        # print(f'[encoder] agents_lanes_embed[0].shape: {agents_lanes_embed[0].shape}') # <= different value in different iterations
+        # print(f'[encoder] agents_lanes_embed[1].shape: {agents_lanes_embed[1].shape}') # <= different value in different iterations
+        print(f'[encoder] lanes_embed.shape: {lanes_embed.shape}')
+        # print(f'[encoder] lanes_embed.shape[1]: {lanes_embed.shape[1]}')
+        # len(agents_lanes_embed) = batch
+        #   agents_lanes_embed[i].shape = [max_agent_states_length + max_lane_states_length, feature]
+        # lanes_embed.shape = [batch, max_lane_states_length, feature]
         #   max_lane_states_length varies between iterations
         #   max_agent_states_length varies between iterations
-        return element_states_batch, lane_states_batch  # h_i, c_j
+        return agents_lanes_embed, lanes_embed  # h_i, c_j
 

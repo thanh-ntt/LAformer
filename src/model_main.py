@@ -18,7 +18,7 @@ class ModelMain(nn.Module):
         hidden_size = args.hidden_size
 
         self.encoder = VectorNet(args)
-        self.global_graph = GlobalGraphRes(hidden_size)
+        self.self_attention = GlobalGraphRes(hidden_size)
         self.decoder = GRUDecoder(args, self)
 
     def forward(self, mapping: List[Dict], device):
@@ -36,25 +36,27 @@ class ModelMain(nn.Module):
         # Encoder
         # self.encoder.forward (section 3.2)
         #   ...
-        #   all_element_states_batch: h_i = Concat[h_i, c_j]
-        all_element_states_batch, lane_states_batch = self.encoder.forward(mapping, vector_matrix, polyline_spans, device, batch_size)
-        # Global interacting graph
-        inputs, inputs_lengths = utils.merge_tensors(all_element_states_batch, device=device)
-        # print(f'[main] inputs.shape: {inputs.shape}')
-        # print(f'[main] len(lane_states_batch): {len(lane_states_batch)}')
-        # print(f'[main] lane_states_batch[0].shape: {lane_states_batch[0].shape}')
-        # print(f'[main] lane_states_batch[1].shape: {lane_states_batch[1].shape}')
-        lane_states_batch, lane_states_length = utils.merge_tensors(lane_states_batch, device=device)
-        # print(f'[main] lane_states_batch.shape: {lane_states_batch.shape}')
+        #   agents_lanes_embed: h_i = Concat[h_i, c_j]
+        agents_lanes_embed, lanes_embed = self.encoder.forward(mapping, vector_matrix, polyline_spans, device, batch_size)
+        print(f'type(lanes_embed): {type(lanes_embed)}')
+        # Global Interaction Graph (after Agent2Lane & Lane2Agent in encoder)
+        lanes_embed_merged, lane_states_length = utils.merge_tensors(lanes_embed, device=device)
+        print(f'[main] lane_states_length[0:2]: {lane_states_length[0:2]}')
+        agents_lanes_embed_merged, inputs_lengths = utils.merge_tensors(agents_lanes_embed, device=device)
+        print(f'[main] inputs_lengths[0:2]: {inputs_lengths[0:2]}')
+        print(f'[main] lanes_embed_merged.shape: {lanes_embed_merged.shape}')
+        print(f'[main] agents_lanes_embed_merged.shape: {agents_lanes_embed_merged.shape}')
         max_poly_num = max(inputs_lengths)
         attention_mask = torch.zeros([batch_size, max_poly_num, max_poly_num], device=device)
         for i, length in enumerate(inputs_lengths):
             attention_mask[i][:length][:length].fill_(1)
-        global_hidden_states = self.global_graph(inputs, attention_mask, mapping)
-        # print(f'[main] global_hidden_states.shape: {global_hidden_states.shape}')
+
+        # SelfAtt{hi}
+        global_embed = self.self_attention(agents_lanes_embed_merged, attention_mask, mapping)
+        # print(f'[main] global_embed.shape: {global_embed.shape}')
 
         # Decoder
-        return self.decoder(mapping, batch_size, lane_states_batch, lane_states_length, inputs, inputs_lengths, global_hidden_states, device)
+        return self.decoder(mapping, batch_size, lanes_embed_merged, lane_states_length, agents_lanes_embed_merged, global_embed, device)
 
     def load_state_dict(self, state_dict, strict: bool = True):
         state_dict_rename_key = {}

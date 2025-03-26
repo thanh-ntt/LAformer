@@ -47,6 +47,7 @@ class GlobalGraph(nn.Module):
         return x.permute(0, 2, 1, 3)
 
     def forward(self, hidden_states, attention_mask=None, mapping=None, return_scores=False):
+        # Self-attention: transform the (same) input into Q,K,V
         mixed_query_layer = self.query(hidden_states)
         mixed_key_layer = nn.functional.linear(hidden_states, self.key.weight)
         mixed_value_layer = self.value(hidden_states)

@@ -152,7 +152,7 @@ class Args:
     data_dir = None
     data_kind = None
     debug = None
-    train_batch_size = None
+    train_batch_size = None # global batch size, not batch size for each worker (each GPU)
     seed = None
     eval_batch_size = None
     distributed_training = None
