@@ -207,7 +207,9 @@ class VectorNet(nn.Module):
         # Lane2Agent (also use lanes_embed)
         agents_embed = agent_states_batch + self.laneGCN_L2A(agent_states_batch, lanes_embed, \
                                             memory_key_padding_mask=src_attention_mask_lane, tgt_key_padding_mask=src_attention_mask_agent)
+        print(f'[encoder] (1) agents_embed.shape: {agents_embed.shape}')
         agents_embed = agents_embed.permute(1, 0, 2)  # [batch, seq_len, feature]
+        print(f'[encoder] (2) agents_embed.shape: {agents_embed.shape}')
         # print(f'[encoder] (2) agents_embed.shape: {agents_embed.shape}')
         lanes_embed = lanes_embed.permute(1, 0, 2)  # [batch, seq_len, feature]
         # print(f'[encoder] (2) lanes_embed.shape: {lanes_embed.shape}')

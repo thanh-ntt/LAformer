@@ -40,13 +40,10 @@ class ModelMain(nn.Module):
         agents_lanes_embed, lanes_embed = self.encoder.forward(mapping, vector_matrix, polyline_spans, device, batch_size)
         print(f'type(lanes_embed): {type(lanes_embed)}')
         # Global Interaction Graph (after Agent2Lane & Lane2Agent in encoder)
-        lanes_embed_merged, lane_states_length = utils.merge_tensors(lanes_embed, device=device)
-        # lane_states_length = [lanes_embed.shape[1]] * lanes_embed.shape[0]
+        lane_states_length = [lanes_embed.shape[1]] * lanes_embed.shape[0]
         assert lane_states_length[0] == lane_states_length[-1] == max(lane_states_length)
-        print(f'[main] lane_states_length: {lane_states_length}')
         agents_lanes_embed_merged, inputs_lengths = utils.merge_tensors(agents_lanes_embed, device=device)
         print(f'[main] inputs_lengths: {inputs_lengths}')
-        print(f'[main] lanes_embed_merged.shape: {lanes_embed_merged.shape}')
         print(f'[main] agents_lanes_embed_merged.shape: {agents_lanes_embed_merged.shape}')
         max_poly_num = max(inputs_lengths)
         assert max_poly_num == inputs_lengths[-1] == inputs_lengths[0]
@@ -59,7 +56,7 @@ class ModelMain(nn.Module):
         # print(f'[main] global_embed.shape: {global_embed.shape}')
 
         # Decoder
-        return self.decoder(mapping, batch_size, lanes_embed_merged, lane_states_length, agents_lanes_embed_merged, global_embed, device)
+        return self.decoder(mapping, batch_size, lanes_embed, lane_states_length, agents_lanes_embed_merged, global_embed, device)
 
     def load_state_dict(self, state_dict, strict: bool = True):
         state_dict_rename_key = {}
