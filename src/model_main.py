@@ -41,12 +41,15 @@ class ModelMain(nn.Module):
         print(f'type(lanes_embed): {type(lanes_embed)}')
         # Global Interaction Graph (after Agent2Lane & Lane2Agent in encoder)
         lanes_embed_merged, lane_states_length = utils.merge_tensors(lanes_embed, device=device)
+        # lane_states_length = [lanes_embed.shape[1]] * lanes_embed.shape[0]
+        assert lane_states_length[0] == lane_states_length[-1] == max(lane_states_length)
         print(f'[main] lane_states_length: {lane_states_length}')
         agents_lanes_embed_merged, inputs_lengths = utils.merge_tensors(agents_lanes_embed, device=device)
         print(f'[main] inputs_lengths: {inputs_lengths}')
         print(f'[main] lanes_embed_merged.shape: {lanes_embed_merged.shape}')
         print(f'[main] agents_lanes_embed_merged.shape: {agents_lanes_embed_merged.shape}')
         max_poly_num = max(inputs_lengths)
+        assert max_poly_num == inputs_lengths[-1] == inputs_lengths[0]
         attention_mask = torch.zeros([batch_size, max_poly_num, max_poly_num], device=device)
         for i, length in enumerate(inputs_lengths):
             attention_mask[i][:length][:length].fill_(1)
