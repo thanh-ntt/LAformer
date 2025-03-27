@@ -40,14 +40,14 @@ class ModelMain(nn.Module):
         agents_lanes_embed_list, lane_states_batch = self.encoder.forward(mapping, vector_matrix, polyline_spans, device, batch_size)
         # Global Interaction Graph (after Agent2Lane & Lane2Agent in encoder)
         # print(f'[main] inputs_lengths: {inputs_lengths}')
-        print(f'[main] lanes_embed.shape: {lane_states_batch.shape}')
+        # print(f'[main] lanes_embed.shape: {lane_states_batch.shape}')
         lanes_embed, _ = utils.merge_tensors(lane_states_batch, device=device)
-        agents_lanes_embed, inputs_length = utils.merge_tensors(agents_lanes_embed_list, device=device)
-        print(f'[main] agents_lanes_embed.shape: {agents_lanes_embed.shape}')
-        max_poly_num = max(inputs_length)
+        agents_lanes_embed, inputs_lengths = utils.merge_tensors(agents_lanes_embed_list, device=device)
+        # print(f'[main] agents_lanes_embed.shape: {agents_lanes_embed.shape}')
+        max_poly_num = max(inputs_lengths)
         attention_mask = torch.zeros([batch_size, max_poly_num, max_poly_num], device=device)
-        for i in range(batch_size):
-            attention_mask[i][:max_poly_num][:max_poly_num].fill_(1)
+        for i, length in enumerate(inputs_lengths):
+            attention_mask[i][:length][:length].fill_(1)
 
         # SelfAtt{hi}
         global_embed = self.self_attention(agents_lanes_embed, attention_mask, mapping)
