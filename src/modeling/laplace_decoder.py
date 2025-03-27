@@ -283,11 +283,11 @@ class GRUDecoder(nn.Module):
         dense_lane_topk = dense_lane_topk.view(batch_size, future_frame_num*mink, self.hidden_size + 1) # [N, sense*mink, hidden_size + 1]
         return dense_lane_topk # [N, H*mink, hidden_size + 1]
 
-    def forward(self, mapping: List[Dict], batch_size, lane_states_batch, lane_states_length, inputs: Tensor,
-                hidden_states: Tensor, device) -> Tuple[torch.Tensor, torch.Tensor]:
+    def forward(self, mapping: List[Dict], batch_size, lanes_embed, lane_states_length, agents_embed: Tensor,
+                global_embed: Tensor, device) -> Tuple[torch.Tensor, torch.Tensor]:
         """lane-aware estimation + multimodal conditional decoder
         Args:
-            lane_states_batch: hidden states of lanes
+            lanes_embed: hidden states of lanes
                 [batch, lane_seq_len, feature]
                     batch: train_batch_size
                     lane_seq_len: max_lane_states_length
@@ -295,7 +295,7 @@ class GRUDecoder(nn.Module):
                 ^ c_j
                 This is not encoded by global graph
 
-            inputs: hidden states of agents before encoding by global graph
+            agents_embed: hidden states of agents before encoding by global graph
                 [batch, seq_len, feature]
                     batch: train_batch_size
                     seq_len: max_agent_states_length + max_lane_states_length
@@ -307,7 +307,7 @@ class GRUDecoder(nn.Module):
                         Afterward, the GIG further explores self-attention and skip-connection to learn the interactions among agents.
                         Namely, h_i = ConCat[h_i, c_j] for j ∈ {1, ..., N_lane}
 
-            hidden_states: hidden states of agents after encoding by global graph
+            global_embed: hidden states of agents after encoding by global graph
                 [batch, seq_len, feature]
                     batch: train_batch_size
                     seq_len: max_agent_states_length + max_lane_states_length
@@ -329,11 +329,11 @@ class GRUDecoder(nn.Module):
         loss = torch.zeros(batch_size, device=device)
         DE = np.zeros([batch_size, self.future_steps])
         # TODO: why the decoder only cares about the embedding of the 1st sequence in inputs & hidden_states?
-        local_embed = inputs[:, 0, :]  # [batch_size, hidden_size]
-        global_embed = hidden_states[:, 0, :] # [batch_size, hidden_size]
+        local_embed = agents_embed[:, 0, :]  # [batch_size, hidden_size]
+        global_embed = global_embed[:, 0, :] # [batch_size, hidden_size]
         if "step_lane_score" in self.args.other_params:
             dense_lane_topk = self.dense_lane_aware\
-            (0, mapping, lane_states_batch, lane_states_length, local_embed, global_embed, device, loss) # [N, dense*mink, hidden_size + 1]
+            (0, mapping, lanes_embed, lane_states_length, local_embed, global_embed, device, loss) # [N, dense*mink, hidden_size + 1]
             dense_lane_topk = dense_lane_topk.permute(1, 0, 2)  # [dense*mink, N, hidden_size + 1]
             # TODO: (paper) "and the candidate lane encodings C as the key and value vectors" => Why need projection proj_topk?
             dense_lane_topk = self.proj_topk(dense_lane_topk) # [dense*mink, N, hidden_size]
