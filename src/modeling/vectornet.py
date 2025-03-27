@@ -193,11 +193,7 @@ class VectorNet(nn.Module):
 
         agents_embed = agents_embed.permute(1, 0, 2)  # [Batch, SeqLen, Dims] - SeqLen: agents
         lanes_embed = lanes_embed.permute(1, 0, 2)  # [Batch, SeqLen, Dims] - SeqLen: lanes
-
-        agents_lanes_embed_list = []
-        for i in range(batch_size):
-            agents_lanes_embed_list.append(torch.cat([agents_embed[i], lanes_embed[i]], dim=0))
-        agents_lanes_embed = torch.stack(agents_lanes_embed_list, dim=0) # [Batch, SeqLen, Dims] - SeqLen: agents + lanes
+        agents_lanes_embed = torch.cat((agents_embed, lanes_embed), dim=1) # [Batch, SeqLen, Dims] - SeqLen: agents + lanes
 
         return agents_lanes_embed, lanes_embed  # h_i, c_j
 

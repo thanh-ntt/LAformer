@@ -170,6 +170,7 @@ class GRUDecoder(nn.Module):
             #       Why need `expand(lane_states_batch.shape), lane_states_batch, lane_states_batch_attention], dim=-1)`?
             #       => To re-shape global_embed into lane_states_batch.shape
             #           ^ for concatenation operation `torch.cat`
+            #       TODO: what if we use full h_i instead of just the h_i of last sequence?
             #   2. c_j: lane_states_batch: hidden states of lanes (lane encoding)
             #   3. A_{i,j}: lane_states_batch_attention: the predicted score of the j-th lane segment at t
             #
@@ -331,7 +332,7 @@ class GRUDecoder(nn.Module):
         # TODO: why the decoder only cares about the embedding of the 1st sequence in inputs & hidden_states?
         #   (?) seems like it discard all previous time steps?
         local_embed = agents_lanes_embed[:, 0, :]  # [batch_size, hidden_size]
-        global_embed = global_embed[:, 0, :] # [batch_size, hidden_size]
+        global_embed = global_embed[:, 0, :] # [batch_size, hidden_size] TODO: what if we use original global_embed?
         if "step_lane_score" in self.args.other_params:
             dense_lane_topk = self.dense_lane_aware(mapping, lanes_embed, local_embed, global_embed, device,
                                                     loss)  # [N, dense*mink, hidden_size + 1]
