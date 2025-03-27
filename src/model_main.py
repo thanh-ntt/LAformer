@@ -18,6 +18,7 @@ class ModelMain(nn.Module):
         hidden_size = args.hidden_size
 
         self.encoder = VectorNet(args)
+        # TODO: question - why changing this global_graph variable name cause performance to reduce from 1.189 -> 1.6???
         self.global_graph = GlobalGraphRes(hidden_size)
         self.decoder = GRUDecoder(args, self)
 
@@ -37,17 +38,16 @@ class ModelMain(nn.Module):
         # self.encoder.forward (section 3.2)
         #   ...
         #   agents_lanes_embed: h_i = Concat[h_i, c_j]
-        agents_lanes_embed_list, lane_states_batch = self.encoder.forward(mapping, vector_matrix, polyline_spans, device, batch_size)
+        agents_lanes_embed_list, lanes_embed = self.encoder.forward(mapping, vector_matrix, polyline_spans, device, batch_size)
         # Global Interaction Graph (after Agent2Lane & Lane2Agent in encoder)
         # print(f'[main] inputs_lengths: {inputs_lengths}')
         # print(f'[main] lanes_embed.shape: {lane_states_batch.shape}')
-        lanes_embed, _ = utils.merge_tensors(lane_states_batch, device=device)
         agents_lanes_embed, inputs_lengths = utils.merge_tensors(agents_lanes_embed_list, device=device)
         # print(f'[main] agents_lanes_embed.shape: {agents_lanes_embed.shape}')
-        max_poly_num = max(inputs_lengths)
+        max_poly_num = agents_lanes_embed.shape[1]
         attention_mask = torch.zeros([batch_size, max_poly_num, max_poly_num], device=device)
-        for i, length in enumerate(inputs_lengths):
-            attention_mask[i][:length][:length].fill_(1)
+        for i in range(batch_size):
+            attention_mask[i][:max_poly_num][:max_poly_num].fill_(1)
 
         # SelfAtt{hi}
         global_embed = self.global_graph(agents_lanes_embed, attention_mask, mapping)
