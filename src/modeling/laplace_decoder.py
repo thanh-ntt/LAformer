@@ -176,6 +176,9 @@ class GRUDecoder(nn.Module):
             # dense_lane_scores.shape = [max_num_lanes, batch_size, t_f]
             #   t_f: future_steps / future_frame_num (default value = 12)
             print(f'[decoder] global_embed.shape: {global_embed.shape}\n\t lane_features.shape: {lane_features.shape}\n\t lane_states_batch_attention.shape: {lane_states_batch_attention.shape}')
+            tmp_tensor = torch.cat([global_embed.unsqueeze(0).expand(
+                lane_features.shape), lane_features, lane_states_batch_attention], dim=-1)
+            print(f'[decoder] tmp_tensor.shape: {tmp_tensor.shape}')
             dense_lane_scores = self.dense_lane_decoder(torch.cat([global_embed.unsqueeze(0).expand(
                 lane_features.shape), lane_features, lane_states_batch_attention], dim=-1)) # [max_len, N, H]
             print(f'[decoder] dense_lane_scores.shape: {dense_lane_scores.shape}')
