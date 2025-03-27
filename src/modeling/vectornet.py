@@ -113,7 +113,7 @@ class VectorNet(nn.Module):
         self.laneGCN_L2A = nn.TransformerDecoder(decoder_layer_L2A, num_layers=num_layers)
 
     def forward(self, mapping: List[Dict], matrix: List[np.ndarray], polyline_spans: List[List[slice]],
-                                 device, batch_size) -> Tuple[List[Tensor], List[Tensor]]:
+                                 device, batch_size) -> Tuple[List[Tensor], Tensor]:
         """
         :param matrix: each value in list is vectors of all element (shape [-1, 128])
         :param polyline_spans: vectors of i_th element is matrix[polyline_spans[i]]
