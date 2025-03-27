@@ -202,17 +202,17 @@ class VectorNet(nn.Module):
         lanes_embed = lane_states_batch + self.laneGCN_A2L(lane_states_batch, agent_states_batch, \
                                             memory_key_padding_mask=src_attention_mask_agent, tgt_key_padding_mask=src_attention_mask_lane)
         # Lane2Agent (also use lanes_embed)
-        agent_states_batch = agent_states_batch + self.laneGCN_L2A(agent_states_batch, lanes_embed, \
+        agents_embed = agent_states_batch + self.laneGCN_L2A(agent_states_batch, lanes_embed, \
                                             memory_key_padding_mask=src_attention_mask_lane, tgt_key_padding_mask=src_attention_mask_agent)
         # print(f'[encoder] (1) agent_states_batch.shape: {agent_states_batch.shape}')
-        agent_states_batch = agent_states_batch.permute(1, 0, 2)  # [batch, seq_len, feature]
+        agents_embed = agents_embed.permute(1, 0, 2)  # [batch, seq_len, feature]
         # print(f'[encoder] (2) agent_states_batch.shape: {agent_states_batch.shape}')
         # print(f'[encoder] (2) agent_states_batch.shape: {agent_states_batch.shape}')
         lanes_embed = lanes_embed.permute(1, 0, 2)  # [batch, seq_len, feature]
         # print(f'[encoder] (2) lanes_embed.shape: {lane_states_batch.shape}')
         agents_lanes_embed_list = []
         for i in range(batch_size):
-            agents_lanes_embed_list.append(torch.cat([agent_states_batch[i], lanes_embed[i]], dim=0))
+            agents_lanes_embed_list.append(torch.cat([agents_embed[i], lanes_embed[i]], dim=0))
         # print(f'[encoder] len(agents_lanes_embed_list): {len(agents_lanes_embed_list)}')
         # print(f'[encoder] agents_lanes_embed_list[0].shape: {agents_lanes_embed_list[0].shape}') # <= different value in different iterations
         # print(f'[encoder] agents_lanes_embed_list[1].shape: {agents_lanes_embed_list[1].shape}') # <= different value in different iterations
