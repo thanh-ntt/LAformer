@@ -129,6 +129,9 @@ class VectorNet(nn.Module):
             polyline_spans (List[List[slice]]): vectors of i_th element is matrix[polyline_spans[i]]
             device (torch.device): The device on which the tensors should be processed.
             batch_size (int): The number of elements in the batch.
+
+        Attributes:
+
         """
         # Convert input lists to tensors
         all_agent_lists, all_lane_lists, batch_split_agent, batch_split_lane = [], [], [], []
@@ -151,18 +154,17 @@ class VectorNet(nn.Module):
             batch_split_lane.append([start_lane, end_lane])
             start_lane = end_lane
         device = all_agent_lists[0].device
-        all_agent_lists, lengths = utils.merge_tensors(all_agent_lists, device, args.vector_size)
-        all_lane_lists, lengths_lane = utils.merge_tensors(all_lane_lists, device, args.vector_size)
+        all_agents, lengths = utils.merge_tensors(all_agent_lists, device, args.vector_size)
+        all_lanes, lengths_lane = utils.merge_tensors(all_lane_lists, device, args.vector_size)
 
         # get agents_polyline_embed & lanes_polyline_embed embedding from polyline sub-graph using MLP & GRU sequentially
         # Question: how does a single PointLevelSubGraph encode ALL agents?
-        agents_polyline_embed_unsplit, _ = self.point_level_sub_graph(all_agent_lists, lengths) # h_i
-        lanes_polyline_embed_unsplit, _ = self.point_level_sub_graph_lane(all_lane_lists, lengths_lane) # c_j
+        agents_polyline_embed_unsplit, _ = self.point_level_sub_graph(all_agents, lengths) # h_i
+        lanes_polyline_embed_unsplit, _ = self.point_level_sub_graph_lane(all_lanes, lengths_lane) # c_j
 
         # Run laneGCN, get element states and lane_states
         agent_states_batch, lane_states_batch = [], [] # len(agent_states_batch) = len(lane_states_batch) = batch
         for i in range(batch_size):
-            map_start_polyline_idx = mapping[i]['map_start_polyline_idx']
             agents_polyline_embed = agents_polyline_embed_unsplit[batch_split_agent[i][0]:batch_split_agent[i][1]]
             lanes_polyline_embed = lanes_polyline_embed_unsplit[batch_split_lane[i][0]:batch_split_lane[i][1]]
             agent_states_batch.append(agents_polyline_embed)
