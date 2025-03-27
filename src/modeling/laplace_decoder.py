@@ -194,6 +194,7 @@ class GRUDecoder(nn.Module):
             # batch_idx = i // future_frame_num (H)
 
             # why can lane_meta be shorter than pred_score? => pred_score is computed from lane_states_batch (merged tensor)
+            subdivided_lane_to_lane_meta = utils.get_from_mapping(mapping, 'subdivided_lane_to_lane_meta')
             assert dense_lane_pred[i].shape[0] >= len(subdivided_lane_to_lane_meta[batch_idx])
 
             pred_score_processed = torch.tensor(dense_lane_pred[i], device=device)
@@ -259,8 +260,6 @@ class GRUDecoder(nn.Module):
         mink = self.args.topk
         dense_lane_topk = torch.zeros((dense_lane_pred.shape[0], mink, self.hidden_size), device=device) # [N*H, mink, hidden_size]
         dense_lane_topk_scores = torch.zeros((dense_lane_pred.shape[0], mink), device=device)   # [N*H, mink]
-
-        subdivided_lane_to_lane_meta = utils.get_from_mapping(mapping, 'subdivided_lane_to_lane_meta')
 
         for i in range(dense_lane_topk_scores.shape[0]): # for each i in N*H (batch_size * future_frame_num)
             batch_idx = i // future_frame_num
