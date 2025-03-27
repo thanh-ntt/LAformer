@@ -117,8 +117,8 @@ class GRUDecoder(nn.Module):
         """future_frame_num lane aware
         Args:
             mapping (list): data mapping
-            lane_features (tensor): hidden states of lanes (lane encoding c_j)
-                shape [batch, seq_len, feature]
+            lane_features (tensor): [batch, lane_seq_len, feature]
+                hidden states of lanes (lane encoding c_j)
             element_hidden_states (tensor): [batch, feature]
             global_embed (tensor): [batch, feature]
                 global_embed is the output of the Global Interaction Graph
@@ -175,9 +175,10 @@ class GRUDecoder(nn.Module):
             #
             # dense_lane_scores.shape = [max_num_lanes, batch_size, t_f]
             #   t_f: future_steps / future_frame_num (default value = 12)
+            print(f'[decoder] global_embed.shape: {global_embed.shape}\n\t lane_features.shape: {lane_features.shape}\n\t lane_states_batch_attention.shape: {lane_states_batch_attention.shape}')
             dense_lane_scores = self.dense_lane_decoder(torch.cat([global_embed.unsqueeze(0).expand(
                 lane_features.shape), lane_features, lane_states_batch_attention], dim=-1)) # [max_len, N, H]
-            # print(f'(1) dense_lane_scores.shape: {dense_lane_scores.shape}')
+            print(f'[decoder] dense_lane_scores.shape: {dense_lane_scores.shape}')
 
             # Lane-scoring head
             # s^_{j,t} = softmax(\theta{ h_i, c_j, A_{i,j} }) <= this does not change shape of the tensor

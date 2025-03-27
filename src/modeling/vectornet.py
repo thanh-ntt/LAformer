@@ -120,7 +120,7 @@ class VectorNet(nn.Module):
         """
         2 steps to get agents & lanes encoding:
             - Use MLP & GRU to encode polyline subgraph
-            - Use cross-attention (Agent2Lane, Lane2Agent)
+            - Use cross-attention (Agent2Lane, Lane2Agent) - laneGCN (?)
                 (Note: self-attention part of GIG is in model_main.py)
 
         Args:
@@ -169,24 +169,10 @@ class VectorNet(nn.Module):
             lanes_polyline_embed = lanes_polyline_embed_unsplit[batch_split_lane[i][0]:batch_split_lane[i][1]]
             agent_states_batch.append(agents_polyline_embed)
             lane_states_batch.append(lanes_polyline_embed)
-        # print(f'[encoder] len(agent_states_batch): {len(agent_states_batch)}')
-        # print(f'[encoder] agent_states_batch[0].shape: {agent_states_batch[0].shape}') # [4, 64] <= different value in different iterations
-        # print(f'[encoder] agent_states_batch[1].shape: {agent_states_batch[1].shape}') # [27, 64] <= different value in different iterations
-        # print(f'[encoder] len(lane_states_batch): {len(lane_states_batch)}')
-        # print(f'[encoder] lane_states_batch[0].shape: {lane_states_batch[0].shape}') # [62, 64] <= different value in different iterations
-        # print(f'[encoder] lane_states_batch[1].shape: {lane_states_batch[1].shape}') # [88, 64] <= different value in different iterations
-        # agent_states_batch.shape = [batch, max_agent_states_length, feature]
-        #   max_agent_states_length (lengths) varies between iterations
-        agent_states_batch, lengths = utils.merge_tensors(agent_states_batch, device, args.hidden_size)
-        # print(f'[encoder] (1) agent_states_batch.shape: {agent_states_batch.shape}')
-        # lane_states_batch.shape = [batch, max_lane_states_length, feature]
-        #   max_lane_states_length (lengths_lane) varies between iterations
-        # print(f'len(lane_states_batch): {len(lane_states_batch)}')
-        # for i in range(10):
-        #     print(f'lane_states_batch[{i}].shape: {lane_states_batch[i].shape}')
-        lane_states_batch, lengths_lane = utils.merge_tensors(lane_states_batch, device, args.hidden_size)
-        # print(f'[encoder] (1) lane_states_batch.shape: {lane_states_batch.shape}')
-        # print(f'[encoder] lengths_lane: {lengths_lane}')
+
+        agent_states_batch, lengths = utils.merge_tensors(agent_states_batch, device, args.hidden_size) # [Batch, SeqLen, Dims] - SeqLen: agents
+        lane_states_batch, lengths_lane = utils.merge_tensors(lane_states_batch, device, args.hidden_size) # [Batch, SeqLen, Dims] - SeqLen: lanes
+
         src_attention_mask_lane = torch.zeros([batch_size, lane_states_batch.shape[1]], device=device)
         src_attention_mask_agent = torch.zeros([batch_size, agent_states_batch.shape[1]], device=device)
         for i in range(batch_size):
@@ -204,28 +190,14 @@ class VectorNet(nn.Module):
         # Lane2Agent
         agents_embed = agent_states_batch + self.laneGCN_L2A(agent_states_batch, lanes_embed, \
                                             memory_key_padding_mask=src_attention_mask_lane, tgt_key_padding_mask=src_attention_mask_agent)
-        # print(f'[encoder] (1) agent_states_batch.shape: {agent_states_batch.shape}')
-        agents_embed = agents_embed.permute(1, 0, 2)  # [batch, seq_len, feature]
-        # print(f'[encoder] (2) agent_states_batch.shape: {agent_states_batch.shape}')
-        # print(f'[encoder] (2) agent_states_batch.shape: {agent_states_batch.shape}')
-        lanes_embed = lanes_embed.permute(1, 0, 2)  # [batch, seq_len, feature]
-        # print(f'[encoder] (2) lanes_embed.shape: {lane_states_batch.shape}')
+
+        agents_embed = agents_embed.permute(1, 0, 2)  # [Batch, SeqLen, Dims] - SeqLen: agents
+        lanes_embed = lanes_embed.permute(1, 0, 2)  # [Batch, SeqLen, Dims] - SeqLen: lanes
+
         agents_lanes_embed_list = []
         for i in range(batch_size):
             agents_lanes_embed_list.append(torch.cat([agents_embed[i], lanes_embed[i]], dim=0))
-        # print(f'[encoder] len(agents_lanes_embed_list): {len(agents_lanes_embed_list)}')
-        print(f'[encoder] agents_lanes_embed_list[0].shape: {agents_lanes_embed_list[0].shape}') # <= different value in different iterations
-        print(f'[encoder] agents_lanes_emlane_states_batchbed_list[1].shape: {agents_lanes_embed_list[1].shape}') # <= different value in different iterations
-        # print(f'[encoder] .shape[1]: {lane_states_batch.shape[1]}')
-        # len(agents_lanes_embed_list) = batch
-        #   agents_lanes_embed_list[i].shape = [max_agent_states_length + max_lane_states_length, feature]
-        # lane_states_batch.shape = [batch, max_lane_states_length, feature]
-        #   max_lane_states_length varies between iterations
-        #   max_agent_states_length varies between iterations
-        agents_lanes_embed = torch.stack(agents_lanes_embed_list, dim=0)
-        print(f'[encoder] agents_lanes_embed[0].shape: {agents_lanes_embed[0].shape}')
-        print(f'[encoder] agents_lanes_embed[1].shape: {agents_lanes_embed[1].shape}')
-        print(f'[encoder] agents_lanes_embed.shape: {agents_lanes_embed.shape}')
-        print(f'[encoder] lanes_embed.shape: {lanes_embed.shape}')
+        agents_lanes_embed = torch.stack(agents_lanes_embed_list, dim=0) # [Batch, SeqLen, Dims] - SeqLen: agents + lanes
+
         return agents_lanes_embed, lanes_embed  # h_i, c_j
 

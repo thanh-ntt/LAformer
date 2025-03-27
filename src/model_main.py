@@ -34,25 +34,21 @@ class ModelMain(nn.Module):
         batch_size = len(vector_matrix)
         utils.batch_origin_init(mapping)
 
-        # Encoder
-        # self.encoder.forward (section 3.2)
-        #   ...
-        #   agents_lanes_embed: h_i = Concat[h_i, c_j]
+        # Encoder (section 3.2)
+        # agents_lanes_embed: [Batch, SeqLen (agents+lanes), Dims]
+        #       agents_lanes_embed: h_i = Concat[h_i, c_j]
+        # lanes_embed: [Batch, SeqLen(lanes), Dims]
         agents_lanes_embed, lanes_embed = self.encoder.forward(mapping, vector_matrix, polyline_spans, device, batch_size)
+
         # Global Interaction Graph (after Agent2Lane & Lane2Agent in encoder)
-        # print(f'[main] inputs_lengths: {inputs_lengths}')
-        # print(f'[main] lanes_embed.shape: {lane_states_batch.shape}')
-        # print(f'[main] agents_lanes_embed.shape: {agents_lanes_embed.shape}')
         max_poly_num = agents_lanes_embed.shape[1]
         attention_mask = torch.zeros([batch_size, max_poly_num, max_poly_num], device=device)
         for i in range(batch_size):
             attention_mask[i][:max_poly_num][:max_poly_num].fill_(1)
-
         # SelfAtt{hi}
-        global_embed = self.global_graph(agents_lanes_embed, attention_mask, mapping)
+        global_embed = self.global_graph(agents_lanes_embed, attention_mask, mapping) # [Batch, SeqLen (agents+lanes), Dims]
         # print(f'[main] global_embed.shape: {global_embed.shape}')
 
-        # Decoder
         return self.decoder(mapping, batch_size, lanes_embed, agents_lanes_embed, global_embed, device)
 
     def load_state_dict(self, state_dict, strict: bool = True):
