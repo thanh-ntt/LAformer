@@ -181,27 +181,28 @@ class VectorNet(nn.Module):
         src_attention_mask_lane = src_attention_mask_lane == 0
         src_attention_mask_agent = src_attention_mask_agent == 0
         lane_states_batch = lane_states_batch.permute(1, 0, 2)  # [seq_len, batch, feature]
-        agent_states_batch = agent_states_batch.permute(1, 0, 2)  # [seq_len, batch, feature]   
-        lane_states_batch = lane_states_batch + self.laneGCN_A2L(lane_states_batch, agent_states_batch, \
+        agent_states_batch = agent_states_batch.permute(1, 0, 2)  # [seq_len, batch, feature]
+
+        lanes_embed = lane_states_batch + self.laneGCN_A2L(lane_states_batch, agent_states_batch, \
                                             memory_key_padding_mask=src_attention_mask_agent, tgt_key_padding_mask=src_attention_mask_lane)
         agent_states_batch = agent_states_batch+ self.laneGCN_L2A(agent_states_batch, lane_states_batch, \
                                             memory_key_padding_mask=src_attention_mask_lane, tgt_key_padding_mask=src_attention_mask_agent)
         agent_states_batch = agent_states_batch.permute(1, 0, 2)  # [batch, seq_len, feature]
         # print(f'[encoder] (2) agent_states_batch.shape: {agent_states_batch.shape}')
-        lane_states_batch = lane_states_batch.permute(1, 0, 2)  # [batch, seq_len, feature]
-        # print(f'[encoder] (2) lane_states_batch.shape: {lane_states_batch.shape}')
+        lanes_embed = lanes_embed.permute(1, 0, 2)  # [batch, seq_len, feature]
+        # print(f'[encoder] (2) lanes_embed.shape: {lanes_embed.shape}')
         element_states_batch = []
         for i in range(batch_size):
-            element_states_batch.append(torch.cat([agent_states_batch[i], lane_states_batch[i]], dim=0))
+            element_states_batch.append(torch.cat([agent_states_batch[i], lanes_embed[i]], dim=0))
         # print(f'[encoder] len(element_states_batch): {len(element_states_batch)}')
         # print(f'[encoder] element_states_batch[0].shape: {element_states_batch[0].shape}') # <= different value in different iterations
         # print(f'[encoder] element_states_batch[1].shape: {element_states_batch[1].shape}') # <= different value in different iterations
-        # print(f'[encoder] lane_states_batch.shape: {lane_states_batch.shape}')
-        # print(f'[encoder] lane_states_batch.shape[1]: {lane_states_batch.shape[1]}')
+        # print(f'[encoder] lanes_embed.shape: {lanes_embed.shape}')
+        # print(f'[encoder] lanes_embed.shape[1]: {lanes_embed.shape[1]}')
         # len(element_states_batch) = batch
         #   element_states_batch[i].shape = [max_agent_states_length + max_lane_states_length, feature]
-        # lane_states_batch.shape = [batch, max_lane_states_length, feature]
+        # lanes_embed.shape = [batch, max_lane_states_length, feature]
         #   max_lane_states_length varies between iterations
         #   max_agent_states_length varies between iterations
-        return element_states_batch, lane_states_batch  # h_i, c_j
+        return element_states_batch, lanes_embed  # h_i, c_j
 
