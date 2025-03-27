@@ -18,7 +18,7 @@ class ModelMain(nn.Module):
         hidden_size = args.hidden_size
 
         self.encoder = VectorNet(args)
-        self.self_attention = GlobalGraphRes(hidden_size)
+        self.global_graph = GlobalGraphRes(hidden_size)
         self.decoder = GRUDecoder(args, self)
 
     def forward(self, mapping: List[Dict], device):
@@ -50,7 +50,7 @@ class ModelMain(nn.Module):
             attention_mask[i][:length][:length].fill_(1)
 
         # SelfAtt{hi}
-        global_embed = self.self_attention(agents_lanes_embed, attention_mask, mapping)
+        global_embed = self.global_graph(agents_lanes_embed, attention_mask, mapping)
         # print(f'[main] global_embed.shape: {global_embed.shape}')
 
         # Decoder
