@@ -36,10 +36,10 @@ class ModelMain(nn.Module):
         # Encoder
         # self.encoder.forward (section 3.2)
         #   ...
-        #   all_element_states_batch: h_i = Concat[h_i, c_j]
-        all_element_states_batch, lane_states_batch = self.encoder.forward(mapping, vector_matrix, polyline_spans, device, batch_size)
+        #   agents_lanes_embed_list: h_i = Concat[h_i, c_j]
+        agents_lanes_embed_list, lane_states_batch = self.encoder.forward(mapping, vector_matrix, polyline_spans, device, batch_size)
         # Global interacting graph
-        inputs, inputs_lengths = utils.merge_tensors(all_element_states_batch, device=device)
+        inputs, inputs_lengths = utils.merge_tensors(agents_lanes_embed_list, device=device)
         # print(f'[main] inputs.shape: {inputs.shape}')
         # print(f'[main] len(lane_states_batch): {len(lane_states_batch)}')
         # print(f'[main] lane_states_batch[0].shape: {lane_states_batch[0].shape}')
