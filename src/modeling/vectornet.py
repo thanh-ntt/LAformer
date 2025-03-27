@@ -201,7 +201,7 @@ class VectorNet(nn.Module):
         # Agent2Lane
         lanes_embed = lane_states_batch + self.laneGCN_A2L(lane_states_batch, agent_states_batch, \
                                             memory_key_padding_mask=src_attention_mask_agent, tgt_key_padding_mask=src_attention_mask_lane)
-        # Lane2Agent (also use lanes_embed)
+        # Lane2Agent
         agents_embed = agent_states_batch + self.laneGCN_L2A(agent_states_batch, lanes_embed, \
                                             memory_key_padding_mask=src_attention_mask_lane, tgt_key_padding_mask=src_attention_mask_agent)
         # print(f'[encoder] (1) agent_states_batch.shape: {agent_states_batch.shape}')
@@ -214,14 +214,18 @@ class VectorNet(nn.Module):
         for i in range(batch_size):
             agents_lanes_embed_list.append(torch.cat([agents_embed[i], lanes_embed[i]], dim=0))
         # print(f'[encoder] len(agents_lanes_embed_list): {len(agents_lanes_embed_list)}')
-        # print(f'[encoder] agents_lanes_embed_list[0].shape: {agents_lanes_embed_list[0].shape}') # <= different value in different iterations
-        # print(f'[encoder] agents_lanes_embed_list[1].shape: {agents_lanes_embed_list[1].shape}') # <= different value in different iterations
-        # print(f'[encoder] lane_states_batch.shape[1]: {lane_states_batch.shape[1]}')
+        print(f'[encoder] agents_lanes_embed_list[0].shape: {agents_lanes_embed_list[0].shape}') # <= different value in different iterations
+        print(f'[encoder] agents_lanes_emlane_states_batchbed_list[1].shape: {agents_lanes_embed_list[1].shape}') # <= different value in different iterations
+        # print(f'[encoder] .shape[1]: {lane_states_batch.shape[1]}')
         # len(agents_lanes_embed_list) = batch
         #   agents_lanes_embed_list[i].shape = [max_agent_states_length + max_lane_states_length, feature]
         # lane_states_batch.shape = [batch, max_lane_states_length, feature]
         #   max_lane_states_length varies between iterations
         #   max_agent_states_length varies between iterations
         agents_lanes_embed = torch.stack(agents_lanes_embed_list, dim=0)
+        print(f'[encoder] agents_lanes_embed[0].shape: {agents_lanes_embed[0].shape}')
+        print(f'[encoder] agents_lanes_embed[1].shape: {agents_lanes_embed[1].shape}')
+        print(f'[encoder] agents_lanes_embed.shape: {agents_lanes_embed.shape}')
+        print(f'[encoder] lanes_embed.shape: {lanes_embed.shape}')
         return agents_lanes_embed, lanes_embed  # h_i, c_j
 
