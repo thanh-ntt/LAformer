@@ -114,7 +114,7 @@ class GRUDecoder(nn.Module):
         self.gt_invalid_num = 0
 
     def dense_lane_aware(self, i, mapping: List[Dict], lane_states_batch, lane_states_length, element_hidden_states, \
-                            element_hidden_states_lengths, global_hidden_states, device, loss):
+                            global_hidden_states, device, loss):
         """future_frame_num lane aware
         Args:
             mapping (list): data mapping
@@ -284,7 +284,7 @@ class GRUDecoder(nn.Module):
         return dense_lane_topk # [N, H*mink, hidden_size + 1]
 
     def forward(self, mapping: List[Dict], batch_size, lane_states_batch, lane_states_length, inputs: Tensor,
-                inputs_lengths: List[int], hidden_states: Tensor, device) -> Tuple[torch.Tensor, torch.Tensor]:
+                hidden_states: Tensor, device) -> Tuple[torch.Tensor, torch.Tensor]:
         """lane-aware estimation + multimodal conditional decoder
         Args:
             lane_states_batch: hidden states of lanes
@@ -333,7 +333,7 @@ class GRUDecoder(nn.Module):
         global_embed = hidden_states[:, 0, :] # [batch_size, hidden_size]
         if "step_lane_score" in self.args.other_params:
             dense_lane_topk = self.dense_lane_aware\
-            (0, mapping, lane_states_batch, lane_states_length, local_embed, inputs_lengths, global_embed, device, loss) # [N, dense*mink, hidden_size + 1]
+            (0, mapping, lane_states_batch, lane_states_length, local_embed, global_embed, device, loss) # [N, dense*mink, hidden_size + 1]
             dense_lane_topk = dense_lane_topk.permute(1, 0, 2)  # [dense*mink, N, hidden_size + 1]
             # TODO: (paper) "and the candidate lane encodings C as the key and value vectors" => Why need projection proj_topk?
             dense_lane_topk = self.proj_topk(dense_lane_topk) # [dense*mink, N, hidden_size]

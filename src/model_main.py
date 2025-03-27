@@ -54,7 +54,7 @@ class ModelMain(nn.Module):
         # print(f'[main] global_hidden_states.shape: {global_hidden_states.shape}')
 
         # Decoder
-        return self.decoder(mapping, batch_size, lane_states_batch, lane_states_length, inputs, inputs_lengths, global_hidden_states, device)
+        return self.decoder(mapping, batch_size, lane_states_batch, lane_states_length, inputs, global_hidden_states, device)
 
     def load_state_dict(self, state_dict, strict: bool = True):
         state_dict_rename_key = {}
