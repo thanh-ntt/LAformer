@@ -644,6 +644,10 @@ def merge_tensors(tensors: List[torch.Tensor], device, hidden_size=None) -> Tupl
     # print("merge_tensor_lengths:" + str(lengths))
     return res, lengths
 
+def get_seq_lens(tensor: torch.Tensor) -> List[int]:
+    lengths = [tensor[i].shape[0] for i in range(tensor.shape[0])]
+    return lengths
+
 def merge_tensors_loss(tensors: List[torch.Tensor], device, pred_length) -> Tuple[Tensor, List[int]]:
     """
     merge a list of tensors into a tensor
