@@ -116,7 +116,7 @@ class VectorNet(nn.Module):
         self.laneGCN_L2A = nn.TransformerDecoder(decoder_layer_L2A, num_layers=num_layers)
 
     def forward(self, mapping: List[Dict], matrix: List[np.ndarray], polyline_spans: List[List[slice]],
-                                 device, batch_size) -> Tuple[List[Tensor], Tensor]:
+                                 device, batch_size) -> Tuple[Tensor, Tensor]:
         """
         2 steps to get agents & lanes encoding:
             - Use MLP & GRU to encode polyline subgraph
@@ -222,5 +222,6 @@ class VectorNet(nn.Module):
         # lane_states_batch.shape = [batch, max_lane_states_length, feature]
         #   max_lane_states_length varies between iterations
         #   max_agent_states_length varies between iterations
-        return agents_lanes_embed_list, lane_states_batch  # h_i, c_j
+        agents_lanes_embed = torch.stack(agents_lanes_embed_list, dim=0)
+        return agents_lanes_embed, lane_states_batch  # h_i, c_j
 
