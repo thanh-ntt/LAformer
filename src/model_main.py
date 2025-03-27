@@ -18,7 +18,7 @@ class ModelMain(nn.Module):
         hidden_size = args.hidden_size
 
         self.encoder = VectorNet(args)
-        self.self_attention = GlobalGraphRes(hidden_size)
+        self.global_graph = GlobalGraphRes(hidden_size)
         self.decoder = GRUDecoder(args, self)
 
     def forward(self, mapping: List[Dict], device):
@@ -50,7 +50,7 @@ class ModelMain(nn.Module):
         attention_mask = torch.zeros([batch_size, max_poly_num, max_poly_num], device=device)
         for i, length in enumerate(inputs_lengths):
             attention_mask[i][:length][:length].fill_(1)
-        global_hidden_states = self.self_attention(inputs, attention_mask, mapping)
+        global_hidden_states = self.global_graph(inputs, attention_mask, mapping)
         # print(f'[main] global_hidden_states.shape: {global_hidden_states.shape}')
 
         # Decoder
