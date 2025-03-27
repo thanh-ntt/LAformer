@@ -199,29 +199,29 @@ class VectorNet(nn.Module):
         lane_states_batch = lane_states_batch.permute(1, 0, 2)  # [seq_len, batch, feature]
         agent_states_batch = agent_states_batch.permute(1, 0, 2)  # [seq_len, batch, feature]
         # Agent2Lane
-        lanes_embed = lane_states_batch + self.laneGCN_A2L(lane_states_batch, agent_states_batch, \
+        lane_states_batch = lane_states_batch + self.laneGCN_A2L(lane_states_batch, agent_states_batch, \
                                             memory_key_padding_mask=src_attention_mask_agent, tgt_key_padding_mask=src_attention_mask_lane)
-        # Lane2Agent (also use lanes_embed)
-        agents_embed = agent_states_batch + self.laneGCN_L2A(agent_states_batch, lanes_embed, \
+        # Lane2Agent (also use lane_states_batch)
+        agent_states_batch = agent_states_batch + self.laneGCN_L2A(agent_states_batch, lane_states_batch, \
                                             memory_key_padding_mask=src_attention_mask_lane, tgt_key_padding_mask=src_attention_mask_agent)
-        print(f'[encoder] (1) agents_embed.shape: {agents_embed.shape}')
-        agents_embed = agents_embed.permute(1, 0, 2)  # [batch, seq_len, feature]
-        print(f'[encoder] (2) agents_embed.shape: {agents_embed.shape}')
-        # print(f'[encoder] (2) agents_embed.shape: {agents_embed.shape}')
-        lanes_embed = lanes_embed.permute(1, 0, 2)  # [batch, seq_len, feature]
-        # print(f'[encoder] (2) lanes_embed.shape: {lanes_embed.shape}')
+        print(f'[encoder] (1) agent_states_batch.shape: {agent_states_batch.shape}')
+        agent_states_batch = agent_states_batch.permute(1, 0, 2)  # [batch, seq_len, feature]
+        print(f'[encoder] (2) agent_states_batch.shape: {agent_states_batch.shape}')
+        # print(f'[encoder] (2) agent_states_batch.shape: {agent_states_batch.shape}')
+        lane_states_batch = lane_states_batch.permute(1, 0, 2)  # [batch, seq_len, feature]
+        # print(f'[encoder] (2) lane_states_batch.shape: {lane_states_batch.shape}')
         agents_lanes_embed_list = []
         for i in range(batch_size):
-            agents_lanes_embed_list.append(torch.cat([agents_embed[i], lanes_embed[i]], dim=0))
+            agents_lanes_embed_list.append(torch.cat([agent_states_batch[i], lane_states_batch[i]], dim=0))
         # print(f'[encoder] len(agents_lanes_embed_list): {len(agents_lanes_embed_list)}')
         # print(f'[encoder] agents_lanes_embed_list[0].shape: {agents_lanes_embed_list[0].shape}') # <= different value in different iterations
         # print(f'[encoder] agents_lanes_embed_list[1].shape: {agents_lanes_embed_list[1].shape}') # <= different value in different iterations
-        # print(f'[encoder] lanes_embed.shape[1]: {lanes_embed.shape[1]}')
+        # print(f'[encoder] lane_states_batch.shape[1]: {lane_states_batch.shape[1]}')
         # len(agents_lanes_embed_list) = batch
         #   agents_lanes_embed_list[i].shape = [max_agent_states_length + max_lane_states_length, feature]
-        # lanes_embed.shape = [batch, max_lane_states_length, feature]
+        # lane_states_batch.shape = [batch, max_lane_states_length, feature]
         #   max_lane_states_length varies between iterations
         #   max_agent_states_length varies between iterations
         agents_lanes_embed = torch.stack(agents_lanes_embed_list, dim=0)
-        return agents_lanes_embed, lanes_embed  # h_i, c_j
+        return agents_lanes_embed, lane_states_batch  # h_i, c_j
 
