@@ -42,9 +42,9 @@ class ModelMain(nn.Module):
         # print(f'[main] inputs_lengths: {inputs_lengths}')
         print(f'[main] lanes_embed.shape: {lane_states_batch.shape}')
         lanes_embed, _ = utils.merge_tensors(lane_states_batch, device=device)
-        agents_lanes_embed, _ = utils.merge_tensors(agents_lanes_embed_list, device=device)
+        agents_lanes_embed, inputs_length = utils.merge_tensors(agents_lanes_embed_list, device=device)
         print(f'[main] agents_lanes_embed.shape: {agents_lanes_embed.shape}')
-        max_poly_num = agents_lanes_embed.shape[1]
+        max_poly_num = max(inputs_length)
         attention_mask = torch.zeros([batch_size, max_poly_num, max_poly_num], device=device)
         for i in range(batch_size):
             attention_mask[i][:max_poly_num][:max_poly_num].fill_(1)
