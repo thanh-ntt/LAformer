@@ -48,8 +48,8 @@ class ModelMain(nn.Module):
         # print(f'[main] lane_states_batch.shape: {lane_states_batch.shape}')
         max_poly_num = max(inputs_lengths)
         attention_mask = torch.zeros([batch_size, max_poly_num, max_poly_num], device=device)
-        for i, length in enumerate(inputs_lengths):
-            attention_mask[i][:length][:length].fill_(1)
+        for i in range(batch_size):
+            attention_mask[i][:max_poly_num][:max_poly_num].fill_(1)
         global_hidden_states = self.self_attention(inputs, attention_mask, mapping)
         # print(f'[main] global_hidden_states.shape: {global_hidden_states.shape}')
 
