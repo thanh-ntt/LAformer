@@ -44,8 +44,8 @@ class ModelMain(nn.Module):
         # print(f'[main] len(lane_states_batch): {len(lane_states_batch)}')
         # print(f'[main] lane_states_batch[0].shape: {lane_states_batch[0].shape}')
         # print(f'[main] lane_states_batch[1].shape: {lane_states_batch[1].shape}')
-        lanes_embed_merged, lane_states_length = utils.merge_tensors(lane_states_batch, device=device)
-        # print(f'[main] lanes_embed_merged.shape: {lanes_embed_merged.shape}')
+        lane_states_batch, lane_states_length = utils.merge_tensors(lane_states_batch, device=device)
+        # print(f'[main] lane_states_batch.shape: {lane_states_batch.shape}')
         max_poly_num = max(inputs_lengths)
         attention_mask = torch.zeros([batch_size, max_poly_num, max_poly_num], device=device)
         for i, length in enumerate(inputs_lengths):
@@ -54,7 +54,7 @@ class ModelMain(nn.Module):
         # print(f'[main] global_hidden_states.shape: {global_hidden_states.shape}')
 
         # Decoder
-        return self.decoder(mapping, batch_size, lanes_embed_merged, lane_states_length, inputs, global_hidden_states, device)
+        return self.decoder(mapping, batch_size, lane_states_batch, lane_states_length, inputs, global_hidden_states, device)
 
     def load_state_dict(self, state_dict, strict: bool = True):
         state_dict_rename_key = {}
