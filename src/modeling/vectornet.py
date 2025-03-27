@@ -135,24 +135,24 @@ class VectorNet(nn.Module):
         """
         # Convert input lists to tensors
         all_agent_lists, all_lane_lists, batch_split_agent, batch_split_lane = [], [], [], []
-        start_lane, end_lane = 0, 0
-        start_agent, end_agent = 0, 0
+        tmp_start_lane, tmp_end_lane = 0, 0
+        tmp_start_agent, tmp_end_agent = 0, 0
         for i in range(batch_size):
-            map_start_polyline_idx = mapping[i]['map_start_polyline_idx']
+            map_start_lane_polyline_idx = mapping[i]['map_start_polyline_idx']
             for j, polyline_span in enumerate(polyline_spans[i]):
                 tensor = torch.tensor(matrix[i][polyline_span],
                                         device=device)
-                if j < map_start_polyline_idx:
+                if j < map_start_lane_polyline_idx:
                     all_agent_lists.append(tensor)
                 else:
                     all_lane_lists.append(tensor)
-                if j == map_start_polyline_idx or map_start_polyline_idx == len(polyline_spans[i]):
-                    end_agent += map_start_polyline_idx
-                    batch_split_agent.append([start_agent, end_agent])
-                    start_agent = end_agent
-            end_lane += len(polyline_spans[i]) - map_start_polyline_idx
-            batch_split_lane.append([start_lane, end_lane])
-            start_lane = end_lane
+                if j == map_start_lane_polyline_idx or map_start_lane_polyline_idx == len(polyline_spans[i]):
+                    tmp_end_agent += map_start_lane_polyline_idx
+                    batch_split_agent.append([tmp_start_agent, tmp_end_agent])
+                    tmp_start_agent = tmp_end_agent
+            tmp_end_lane += len(polyline_spans[i]) - map_start_lane_polyline_idx
+            batch_split_lane.append([tmp_start_lane, tmp_end_lane])
+            tmp_start_lane = tmp_end_lane
         device = all_agent_lists[0].device
         all_agents, lengths = utils.merge_tensors(all_agent_lists, device, args.vector_size)
         all_lanes, lengths_lane = utils.merge_tensors(all_lane_lists, device, args.vector_size)

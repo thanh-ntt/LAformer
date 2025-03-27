@@ -487,7 +487,7 @@ class NuScenesData(SingleAgentDataset):
             end = len(self.vectors)
             if start < end:
                 self.polyline_spans.append([start, end])
-        if len(self.polyline_spans) == self.map_start_polyline_idx:
+        if len(self.polyline_spans) == self.map_start_lane_polyline_idx:
             self.mapping = None # TODO: why do we even do this?
         return 0
 
@@ -540,7 +540,7 @@ class NuScenesData(SingleAgentDataset):
             else:
                 self.polyline_spans.append([start, end])
         assert len(self.agents_past_traj_rel) == len(self.polyline_spans) - 1
-        self.map_start_polyline_idx = len(self.polyline_spans)
+        self.map_start_lane_polyline_idx = len(self.polyline_spans)
         return 0
 
     def encode_future_traj(self, idx: int) -> int:
@@ -596,7 +596,7 @@ class NuScenesData(SingleAgentDataset):
             trajs=self.agents_past_traj_rel,
             polygons=self.subdivided_lane_traj_rel,
             polyline_spans=[slice(each[0], each[1]) for each in self.polyline_spans], # generated from the index of self.subdivided_lane_traj_rel
-            map_start_polyline_idx=self.map_start_polyline_idx,
+            map_start_polyline_idx=self.map_start_lane_polyline_idx,
             matrix=np.array(self.vectors),
 
             dense_lane_labels=self.stepwise_label, # index of the GT lane segment (for 12 time steps)
