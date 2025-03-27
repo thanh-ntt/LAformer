@@ -18,6 +18,7 @@ class ModelMain(nn.Module):
         hidden_size = args.hidden_size
 
         self.encoder = VectorNet(args)
+        # TODO: question - why changing this global_graph variable name cause performance to reduce from 1.189 -> 1.6???
         self.global_graph = GlobalGraphRes(hidden_size)
         self.decoder = GRUDecoder(args, self)
 
