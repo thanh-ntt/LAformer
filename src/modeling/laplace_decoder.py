@@ -16,26 +16,6 @@ from modeling.vectornet import *
 from modeling.motion_refinement import trajectory_refinement
 from utils_files.loss import *
 
-class DecoderResCat(nn.Module):
-    """
-    DecoderResCat is a class name that likely stands for "Decoder with Residual Concatenation".
-    This class implements a neural network module that uses a Multi-Layer Perceptron (MLP)
-    to process input features and then concatenates the original input features with the output
-    of the MLP before passing them through a fully connected layer.
-
-    This concatenation can be seen as a form of residual connection,
-    which helps in preserving the original input information while adding the learned transformations from the MLP.
-    """
-    def __init__(self, hidden_size, in_features, out_features=60):
-        super(DecoderResCat, self).__init__()
-        self.mlp = MLP(in_features, hidden_size)
-        self.fc = nn.Linear(hidden_size + in_features, out_features)
-
-    def forward(self, hidden_states):
-        hidden_states = torch.cat([hidden_states, self.mlp(hidden_states)], dim=-1)
-        hidden_states = self.fc(hidden_states)
-        return hidden_states
-
 class GRUDecoder(nn.Module):
     def __init__(self, args: config.Args, vectornet) -> None:
         super(GRUDecoder, self).__init__()
@@ -85,10 +65,7 @@ class GRUDecoder(nn.Module):
             self.multihead_proj_global = nn.Sequential(
                                         nn.Linear(self.hidden_size*2, self.num_modes * self.hidden_size),
                                         nn.LayerNorm(self.num_modes * self.hidden_size),
-                                        nn.ReLU(inplace=True))  
-            decoder_layer_dense_label = nn.TransformerDecoderLayer(d_model=self.hidden_size, nhead=32, dim_feedforward=self.hidden_size)
-            self.dense_label_cross_attention = nn.TransformerDecoder(decoder_layer_dense_label, num_layers=1)
-            self.dense_lane_decoder = DecoderResCat(self.hidden_size, self.hidden_size * 3, out_features=self.future_frame_num)
+                                        nn.ReLU(inplace=True))
             self.proj_topk = MLP(self.hidden_size+1, self.hidden_size)
             decoder_layer_aggregation = nn.TransformerDecoderLayer(d_model=self.hidden_size, nhead=32, dim_feedforward=self.hidden_size)
             self.aggregation_cross_att= nn.TransformerDecoder(decoder_layer_aggregation, num_layers=1)
@@ -285,7 +262,7 @@ class GRUDecoder(nn.Module):
         return dense_lane_topk # [N, H*mink, hidden_size + 1]
 
     def forward(self, mapping: List[Dict], batch_size, lanes_embed, agents_lanes_embed: Tensor, global_embed: Tensor,
-                device, loss) -> Tuple[torch.Tensor, torch.Tensor]:
+                dense_lane_topk, device, loss) -> Tuple[torch.Tensor, torch.Tensor]:
         """lane-aware estimation + multimodal conditional decoder
         Args:
             lanes_embed: hidden states of lanes
@@ -333,8 +310,8 @@ class GRUDecoder(nn.Module):
         local_embed = agents_lanes_embed[:, 0, :]  # [batch_size, hidden_size]
         global_embed = global_embed[:, 0, :] # [batch_size, hidden_size] TODO: what if we use original global_embed?
         if "step_lane_score" in self.args.other_params:
-            dense_lane_topk = self.dense_lane_aware(mapping, lanes_embed, local_embed, global_embed, device,
-                                                    loss)  # [N, dense*mink, hidden_size + 1]
+            # dense_lane_topk = self.dense_lane_aware(mapping, lanes_embed, local_embed, global_embed, device,
+            #                                         loss)  # [N, dense*mink, hidden_size + 1]
             dense_lane_topk = dense_lane_topk.permute(1, 0, 2)  # [dense*mink, N, hidden_size + 1]
             # TODO: (paper) "and the candidate lane encodings C as the key and value vectors" => Why need projection proj_topk?
             dense_lane_topk = self.proj_topk(dense_lane_topk) # [dense*mink, N, hidden_size]

@@ -4,6 +4,8 @@
 from typing import Dict, List
 import torch
 from torch import nn
+
+from modeling.goal_prediction import GoalPrediction
 from modeling.vectornet import VectorNet
 from modeling.global_graph import CrossAttention, GlobalGraphRes
 from modeling.laplace_decoder import  GRUDecoder
@@ -20,6 +22,7 @@ class ModelMain(nn.Module):
         self.encoder = VectorNet(args)
         # TODO: question - why changing this global_graph variable name cause performance to reduce from 1.189 -> 1.6???
         self.global_graph = GlobalGraphRes(hidden_size)
+        self.goal_prediction = GoalPrediction(args)
         self.decoder = GRUDecoder(args, self)
 
     def forward(self, mapping: List[Dict], device):
@@ -51,7 +54,11 @@ class ModelMain(nn.Module):
 
         loss = torch.zeros(batch_size, device=device)
 
-        return self.decoder(mapping, batch_size, lanes_embed, agents_lanes_embed, global_embed, device, loss)
+        if "step_lane_score" in args.other_params:
+            dense_lane_topk = self.dense_lane_aware(mapping, lanes_embed, agents_lanes_embed, global_embed, device,
+                                                    loss)  # [N, dense*mink, hidden_size + 1]
+
+        return self.decoder(mapping, batch_size, lanes_embed, agents_lanes_embed, global_embed, dense_lane_topk, device, loss)
 
     def load_state_dict(self, state_dict, strict: bool = True):
         state_dict_rename_key = {}
