@@ -10,6 +10,8 @@ import torch.nn.functional as F
 from torch import nn, Tensor
 from typing import Dict, List, Tuple, NamedTuple, Any
 import numpy as np
+
+from modeling.goal_prediction import DecoderResCat
 from utils_files import utils, config
 from utils_files.utils import init_weights, get_random_ints, compute_angle_diff
 from modeling.vectornet import *
@@ -62,6 +64,11 @@ class GRUDecoder(nn.Module):
         # self.reg_loss = GaussianNLLLoss(reduction='none')
         self.cls_loss = SoftTargetCrossEntropyLoss(reduction='none')
         if "step_lane_score" in args.other_params:
+            decoder_layer_dense_label = nn.TransformerDecoderLayer(d_model=args.hidden_size, nhead=32,
+                                                                   dim_feedforward=args.hidden_size)
+            self.dense_label_cross_attention = nn.TransformerDecoder(decoder_layer_dense_label, num_layers=1)
+            self.dense_lane_decoder = DecoderResCat(args.hidden_size, args.hidden_size * 3,
+                                                    out_features=args.future_frame_num)
             self.multihead_proj_global = nn.Sequential(
                                         nn.Linear(self.hidden_size*2, self.num_modes * self.hidden_size),
                                         nn.LayerNorm(self.num_modes * self.hidden_size),
