@@ -139,7 +139,7 @@ class GoalPrediction(nn.Module):
                     view(batch_size, future_frame_num).sum(dim=1) # cross-entropy loss L_lane
 
         mink = self.args.topk
-        dense_lane_topk = torch.zeros((dense_lane_pred.shape[0], mink, self.hidden_size), device=device) # [N*H, mink, hidden_size]
+        dense_lane_topk = torch.zeros((dense_lane_pred.shape[0], mink, self.args.hidden_size), device=device) # [N*H, mink, hidden_size]
         dense_lane_topk_scores = torch.zeros((dense_lane_pred.shape[0], mink), device=device)   # [N*H, mink]
 
         for i in range(dense_lane_topk_scores.shape[0]): # for each i in N*H (batch_size * future_frame_num)
@@ -157,5 +157,5 @@ class GoalPrediction(nn.Module):
 
         # obtain candidate lane encodings C = ConCat{c_{1:k}, s^_{1:k}}^{t_f}_{t=1}
         dense_lane_topk = torch.cat([dense_lane_topk, dense_lane_topk_scores.unsqueeze(-1)], dim=-1) # [N*H, mink, hidden_size + 1]
-        dense_lane_topk = dense_lane_topk.view(batch_size, future_frame_num*mink, self.hidden_size + 1) # [N, sense*mink, hidden_size + 1]
+        dense_lane_topk = dense_lane_topk.view(batch_size, future_frame_num*mink, self.args.hidden_size + 1) # [N, sense*mink, hidden_size + 1]
         return dense_lane_topk # [N, H*mink, hidden_size + 1]
