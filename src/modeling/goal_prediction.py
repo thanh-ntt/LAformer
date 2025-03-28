@@ -147,6 +147,7 @@ class GoalPrediction(nn.Module):
         mink = self.args.topk
         dense_lane_topk = torch.zeros((dense_lane_pred.shape[0], mink, self.args.hidden_size), device=device) # [N*H, mink, hidden_size]
         dense_lane_topk_scores = torch.zeros((dense_lane_pred.shape[0], mink), device=device)   # [N*H, mink]
+        print(f'[goal_prediction] dense_lane_topk_scores.shape: {dense_lane_topk_scores.shape}')
 
         for i in range(dense_lane_topk_scores.shape[0]): # for each i in N*H (batch_size * future_frame_num)
             batch_idx = i // future_frame_num
