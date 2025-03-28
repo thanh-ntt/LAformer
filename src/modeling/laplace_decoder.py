@@ -121,7 +121,7 @@ class GRUDecoder(nn.Module):
         Returns:
             tensor: candidate lane encodings C = ConCat{c_{1:k}, s^_{1:k}}^{t_f}_{t=1}
         """
-        def compute_dense_lane_scores():
+        def compute_dense_lane_scores(lane_features):
             """predict score of the j-th lane segment at future time step t
             TODO: loss re-weighting
 
@@ -139,6 +139,7 @@ class GRUDecoder(nn.Module):
             print(
                 f'[laplace_decoder.compute_dense_lane_scores] lane_features.shape: {lane_features.shape}, agents_lanes_embed.shape: {element_hidden_states.shape}, global_embed.shape: {global_embed.shape}')
 
+            lane_features = lane_features.permute(1, 0, 2)  # [max_len, N, feature]
             # Scaled dot product attention block
             # h_{i,att}: global_embed_att = cross_attention(Q: h_i, K,V: C)
             # Q: lane_features = lane encoding c_j
@@ -223,13 +224,13 @@ class GRUDecoder(nn.Module):
         for i in range(batch_size):
             src_attention_mask_lane[i, :lane_seq_length] = 1
         src_attention_mask_lane = src_attention_mask_lane == 0
-        lane_features = lane_features.permute(1, 0, 2) # [max_len, N, feature]
+        # lane_features = lane_features.permute(1, 0, 2) # [max_len, N, feature]
 
         # dense_lane_pred: prediction about the probability of each lane segment index that the agent will go to
         #       ^ that's why size = [N*H, max_len] <= max_len is # lane segments
-        dense_lane_pred = compute_dense_lane_scores() # [max_len, N, H] - log(true_pred_score)
+        dense_lane_pred = compute_dense_lane_scores(lane_features) # [max_len, N, H] - log(true_pred_score)
         dense_lane_pred = dense_lane_pred.permute(1, 0, 2) # [N, max_len, H]
-        lane_features = lane_features.permute(1, 0, 2) # [N, max_len, feature]
+        # lane_features = lane_features.permute(1, 0, 2) # [N, max_len, feature]
         dense_lane_pred =  dense_lane_pred.permute(0, 2, 1) # [N, H, max_len]
         dense_lane_pred = dense_lane_pred.contiguous().view(-1, lane_seq_length)  # [N*H, max_len]
 
