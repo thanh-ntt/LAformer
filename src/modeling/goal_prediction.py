@@ -88,13 +88,13 @@ class GoalPrediction(nn.Module):
         # dense_lane_scores.shape = [max_num_lanes, batch_size, t_f]
         #   t_f: future_steps / future_frame_num (default value = 12)
         print(
-            f'[decoder] global_embed.shape: {global_embed.shape}\n\t lane_features.shape: {lane_features.shape}\n\t lane_states_batch_attention.shape: {lane_states_batch_attention.shape}')
+            f'[goal_prediction] global_embed.shape: {global_embed.shape}\n\t lane_features.shape: {lane_features.shape}\n\t lane_states_batch_attention.shape: {lane_states_batch_attention.shape}')
         tmp_tensor = torch.cat([global_embed.unsqueeze(0).expand(
             lane_features.shape), lane_features, lane_states_batch_attention], dim=-1)
-        print(f'[decoder] tmp_tensor.shape: {tmp_tensor.shape}')
+        print(f'[goal_prediction] tmp_tensor.shape: {tmp_tensor.shape}')
         dense_lane_scores = self.dense_lane_decoder(torch.cat([global_embed.unsqueeze(0).expand(
             lane_features.shape), lane_features, lane_states_batch_attention], dim=-1))  # [max_len, N, H]
-        print(f'[decoder] dense_lane_scores.shape: {dense_lane_scores.shape}')
+        print(f'[goal_prediction] dense_lane_scores.shape: {dense_lane_scores.shape}')
 
         # Lane-scoring head
         # s^_{j,t} = softmax(\theta{ h_i, c_j, A_{i,j} }) <= this does not change shape of the tensor
@@ -124,7 +124,7 @@ class GoalPrediction(nn.Module):
         assert dense_lane_pred.shape == (lane_seq_length, batch_size, future_frame_num)
 
         dense_lane_pred = dense_lane_pred.permute(1, 0, 2) # [N, max_len, H]
-        lane_features = lanes_embed.permute(1, 0, 2) # [N, max_len, feature]
+        lanes_embed = lanes_embed.permute(1, 0, 2) # [N, max_len, feature]
         dense_lane_pred =  dense_lane_pred.permute(0, 2, 1) # [N, H, max_len]
         dense_lane_pred = dense_lane_pred.contiguous().view(-1, lane_seq_length)  # [N*H, max_len]
 
@@ -152,7 +152,7 @@ class GoalPrediction(nn.Module):
             k = min(mink, lane_seq_length)
             _, topk_idxs = torch.topk(dense_lane_pred[i], k) # select top k=2 (or 4) lane segments to guide decoder
             # topk_idxs = top_k_indices()
-            dense_lane_topk[i][:k] = lane_features[batch_idx, topk_idxs] # [N*H, mink, hidden_size]
+            dense_lane_topk[i][:k] = lanes_embed[batch_idx, topk_idxs] # [N*H, mink, hidden_size]
             dense_lane_topk_scores[i][:k] = dense_lane_pred[i][topk_idxs] # [N*H, mink]
 
             self.lane_segment_in_topk_num += topk_idxs.size(0)
