@@ -154,6 +154,8 @@ class GoalPrediction(nn.Module):
             k = min(mink, lane_seq_length)
             _, topk_idxs = torch.topk(dense_lane_pred[i], k) # select top k=2 (or 4) lane segments to guide decoder
             # topk_idxs = top_k_indices()
+            print(f'[goal_prediction] topk_idxs.shape: {topk_idxs.shape}')
+            print(f'[goal_prediction] topk_idxs: {topk_idxs}')
             dense_lane_topk[i][:k] = lanes_embed[batch_idx, topk_idxs] # [N*H, mink, hidden_size]
             dense_lane_topk_scores[i][:k] = dense_lane_pred[i][topk_idxs] # [N*H, mink]
 
