@@ -36,6 +36,11 @@ class GoalPrediction(nn.Module):
                                                 out_features=args.future_frame_num)
         self.args = args
 
+        self.lane_segment_in_topk_num = 0
+        self.invalid_lane_segment_in_topk_num = 0
+        self.prediction_num = 0
+        self.gt_invalid_num = 0
+
     def compute_dense_lane_scores(self, lane_features, agents_lanes_embed, global_embed, device):
         """predict score of the j-th lane segment at future time step t
 
