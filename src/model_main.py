@@ -55,7 +55,7 @@ class ModelMain(nn.Module):
         loss = torch.zeros(batch_size, device=device)
 
         if "step_lane_score" in args.other_params:
-            dense_lane_topk = self.dense_lane_aware(mapping, lanes_embed, agents_lanes_embed, global_embed, device,
+            dense_lane_topk = self.goal_prediction(mapping, lanes_embed, agents_lanes_embed, global_embed, device,
                                                     loss)  # [N, dense*mink, hidden_size + 1]
 
         return self.decoder(mapping, batch_size, lanes_embed, agents_lanes_embed, global_embed, dense_lane_topk, device, loss)
