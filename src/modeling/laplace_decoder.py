@@ -128,6 +128,10 @@ class GRUDecoder(nn.Module):
                     seq_len varies between iterations
                     future_steps: t_f (in section 3.3)
             """
+
+            print(
+                f'[goal_prediction.compute_dense_lane_scores] lane_features.shape: {lane_features.shape}, agents_lanes_embed.shape: {element_hidden_states.shape}, global_embed.shape: {global_embed.shape}')
+
             # Scaled dot product attention block
             # h_{i,att}: global_embed_att = cross_attention(Q: h_i, K,V: C)
             # Q: lane_features = lane encoding c_j
@@ -310,8 +314,8 @@ class GRUDecoder(nn.Module):
         local_embed = agents_lanes_embed[:, 0, :]  # [batch_size, hidden_size]
         global_embed = global_embed[:, 0, :] # [batch_size, hidden_size] TODO: what if we use original global_embed?
         if "step_lane_score" in self.args.other_params:
-            # dense_lane_topk = self.dense_lane_aware(mapping, lanes_embed, local_embed, global_embed, device,
-            #                                         loss)  # [N, dense*mink, hidden_size + 1]
+            dense_lane_topk = self.dense_lane_aware(mapping, lanes_embed, local_embed, global_embed, device,
+                                                    loss)  # [N, dense*mink, hidden_size + 1]
             dense_lane_topk = dense_lane_topk.permute(1, 0, 2)  # [dense*mink, N, hidden_size + 1]
             # TODO: (paper) "and the candidate lane encodings C as the key and value vectors" => Why need projection proj_topk?
             dense_lane_topk = self.proj_topk(dense_lane_topk) # [dense*mink, N, hidden_size]
