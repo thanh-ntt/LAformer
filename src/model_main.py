@@ -49,7 +49,9 @@ class ModelMain(nn.Module):
         global_embed = self.global_graph(agents_lanes_embed, attention_mask, mapping) # [Batch, SeqLen (agents+lanes), Dims]
         # print(f'[main] global_embed.shape: {global_embed.shape}')
 
-        return self.decoder(mapping, batch_size, lanes_embed, agents_lanes_embed, global_embed, device)
+        loss = torch.zeros(batch_size, device=device)
+
+        return self.decoder(mapping, batch_size, lanes_embed, agents_lanes_embed, global_embed, device, loss)
 
     def load_state_dict(self, state_dict, strict: bool = True):
         state_dict_rename_key = {}

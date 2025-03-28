@@ -285,7 +285,7 @@ class GRUDecoder(nn.Module):
         return dense_lane_topk # [N, H*mink, hidden_size + 1]
 
     def forward(self, mapping: List[Dict], batch_size, lanes_embed, agents_lanes_embed: Tensor, global_embed: Tensor,
-                device) -> Tuple[torch.Tensor, torch.Tensor]:
+                device, loss) -> Tuple[torch.Tensor, torch.Tensor]:
         """lane-aware estimation + multimodal conditional decoder
         Args:
             lanes_embed: hidden states of lanes
@@ -327,7 +327,6 @@ class GRUDecoder(nn.Module):
         """
         labels = utils.get_from_mapping(mapping, 'labels')
         labels_is_valid = utils.get_from_mapping(mapping, 'labels_is_valid')
-        loss = torch.zeros(batch_size, device=device)
         DE = np.zeros([batch_size, self.future_steps])
         # TODO: why the decoder only cares about the embedding of the 1st sequence in inputs & hidden_states?
         #   (?) seems like it discard all previous time steps?
