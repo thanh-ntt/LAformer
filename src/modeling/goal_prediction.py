@@ -55,6 +55,7 @@ class GoalPrediction(nn.Module):
                 future_steps: t_f (in section 3.3)
         """
         batch_size, lane_seq_length = lane_features.shape[0], lane_features.shape[1]
+        print(f'[goal_prediction.compute_dense_lane_scores] lane_features.shape: {lane_features.shape}, agents_lanes_embed.shape: {agents_lanes_embed.shape}, global_embed.shape: {global_embed.shape}')
 
         src_attention_mask_lane = torch.zeros([batch_size, lane_features.shape[1]], device=device) # [N, max_len]
         for i in range(batch_size):
