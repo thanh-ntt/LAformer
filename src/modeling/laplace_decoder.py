@@ -224,14 +224,11 @@ class GRUDecoder(nn.Module):
         for i in range(batch_size):
             src_attention_mask_lane[i, :lane_seq_length] = 1
         src_attention_mask_lane = src_attention_mask_lane == 0
-        # lane_features = lane_features.permute(1, 0, 2) # [max_len, N, feature]
 
         # dense_lane_pred: prediction about the probability of each lane segment index that the agent will go to
         #       ^ that's why size = [N*H, max_len] <= max_len is # lane segments
         dense_lane_pred = compute_dense_lane_scores(lane_features) # [max_len, N, H] - log(true_pred_score)
-        dense_lane_pred = dense_lane_pred.permute(1, 0, 2) # [N, max_len, H]
-        # lane_features = lane_features.permute(1, 0, 2) # [N, max_len, feature]
-        dense_lane_pred =  dense_lane_pred.permute(0, 2, 1) # [N, H, max_len]
+        dense_lane_pred =  dense_lane_pred.permute(1, 2, 0) # [N, H, max_len]
         dense_lane_pred = dense_lane_pred.contiguous().view(-1, lane_seq_length)  # [N*H, max_len]
 
         future_frame_num = self.future_frame_num  # H

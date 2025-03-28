@@ -125,8 +125,6 @@ class GoalPrediction(nn.Module):
         assert dense_lane_pred.shape == (lane_seq_length, batch_size, future_frame_num)
 
         dense_lane_pred = dense_lane_pred.permute(1, 0, 2) # [N, max_len, H]
-        # lanes_embed = lanes_embed.permute(1, 0, 2) # [N, max_len, feature]
-        print(f'[goal_prediction] (2) lanes_embed.shape: {lanes_embed.shape}')
         dense_lane_pred =  dense_lane_pred.permute(0, 2, 1) # [N, H, max_len]
         dense_lane_pred = dense_lane_pred.contiguous().view(-1, lane_seq_length)  # [N*H, max_len]
         print(f'[goal_prediction] dense_lane_pred.shape: {dense_lane_pred.shape}')
