@@ -130,7 +130,7 @@ class GRUDecoder(nn.Module):
             """
 
             print(
-                f'[goal_prediction.compute_dense_lane_scores] lane_features.shape: {lane_features.shape}, agents_lanes_embed.shape: {element_hidden_states.shape}, global_embed.shape: {global_embed.shape}')
+                f'[laplace_decoder.compute_dense_lane_scores] lane_features.shape: {lane_features.shape}, agents_lanes_embed.shape: {element_hidden_states.shape}, global_embed.shape: {global_embed.shape}')
 
             # Scaled dot product attention block
             # h_{i,att}: global_embed_att = cross_attention(Q: h_i, K,V: C)
