@@ -127,6 +127,7 @@ class GoalPrediction(nn.Module):
         lanes_embed = lanes_embed.permute(1, 0, 2) # [N, max_len, feature]
         dense_lane_pred =  dense_lane_pred.permute(0, 2, 1) # [N, H, max_len]
         dense_lane_pred = dense_lane_pred.contiguous().view(-1, lane_seq_length)  # [N*H, max_len]
+        print(f'[goal_prediction] dense_lane_pred.shape: {dense_lane_pred.shape}')
 
         # TODO: only use during training (now move out of `if self.args.do_train` for debugging)
         # dense_lane_targets: GT lane segment index
